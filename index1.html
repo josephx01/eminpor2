@@ -1425,6 +1425,11 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('JavaScript loaded successfully');
     
+    // Performance optimization variables
+    let isScrolling = false;
+    let resizeTimeout = null;
+    let animationFrame = null;
+    
     // ===============================
     // 1. LOADER - IMPROVED WITH HIDDEN SCROLLBAR
     // ===============================
@@ -1454,7 +1459,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ===============================
-    // 2. WELCOME TEXT EVAPORATION
+    // 2. WELCOME TEXT EVAPORATION - OPTIMIZED
     // ===============================
     function initWelcomeEvaporation() {
         const welcomeText = document.querySelector('.hero-title') || 
@@ -1463,21 +1468,25 @@ document.addEventListener('DOMContentLoaded', function() {
                           document.querySelector('[class*="hero-title"]');
         
         if (welcomeText) {
-            // Split text into letters
+            // Split text into letters with requestAnimationFrame
             const text = welcomeText.textContent;
             welcomeText.innerHTML = '';
             
-            [...text].forEach((letter, index) => {
-                const span = document.createElement('span');
-                span.className = 'letter';
-                span.textContent = letter === ' ' ? '\u00A0' : letter; // Non-breaking space
-                span.style.animationDelay = `${index * 0.05}s`;
-                welcomeText.appendChild(span);
+            requestAnimationFrame(() => {
+                [...text].forEach((letter, index) => {
+                    const span = document.createElement('span');
+                    span.className = 'letter';
+                    span.textContent = letter === ' ' ? '\u00A0' : letter;
+                    span.style.animationDelay = `${index * 0.05}s`;
+                    welcomeText.appendChild(span);
+                });
             });
             
             // Start evaporation after 10 seconds
             setTimeout(() => {
-                welcomeText.classList.add('evaporating');
+                requestAnimationFrame(() => {
+                    welcomeText.classList.add('evaporating');
+                });
                 
                 // Optional: Remove element completely after animation
                 setTimeout(() => {
@@ -1488,34 +1497,42 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Initialize welcome evaporation
-    initWelcomeEvaporation();
+    requestAnimationFrame(() => {
+        initWelcomeEvaporation();
+    });
 
     // ===============================
-    // 3. CUSTOM CURSOR
+    // 3. CUSTOM CURSOR - OPTIMIZED
     // ===============================
     const cursor = document.querySelector('.custom-cursor');
     if (cursor && window.innerWidth > 480) {
         const hoverElements = document.querySelectorAll('a, button, .reel-card, .work-card, .lightbox-trigger, img');
+        let cursorX = 0, cursorY = 0;
         
-        document.addEventListener('mousemove', (e) => {
-            cursor.style.left = (e.clientX - 8) + 'px';
-            cursor.style.top = (e.clientY - 8) + 'px';
-        });
+        // Throttled cursor movement
+        const updateCursor = throttle((e) => {
+            cursorX = e.clientX - 8;
+            cursorY = e.clientY - 8;
+            cursor.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0)`;
+        }, 16);
+        
+        document.addEventListener('mousemove', updateCursor, { passive: true });
 
         hoverElements.forEach(el => {
-            el.addEventListener('mouseenter', () => cursor.classList.add('hover'));
-            el.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+            el.addEventListener('mouseenter', () => cursor.classList.add('hover'), { passive: true });
+            el.addEventListener('mouseleave', () => cursor.classList.remove('hover'), { passive: true });
         });
     }
 
     // ===============================
-    // 4. MOBILE MENU - WITH HIDDEN SCROLLBAR
+    // 4. MOBILE MENU - OPTIMIZED
     // ===============================
     const hamburger = document.querySelector('.hamburger');
     const mobileMenu = document.querySelector('.mobile-menu');
     
     if (hamburger && mobileMenu) {
-        hamburger.addEventListener('click', function() {
+        hamburger.addEventListener('click', function(e) {
+            e.preventDefault();
             const isActive = hamburger.classList.toggle('active');
             mobileMenu.classList.toggle('active');
             
@@ -1523,165 +1540,156 @@ document.addEventListener('DOMContentLoaded', function() {
             if (isActive) {
                 document.body.style.overflow = 'hidden';
             } else {
-                // Force enable scroll with hidden scrollbar when menu closes
                 document.body.style.overflow = 'auto';
                 document.body.style.overflowY = 'auto';
                 document.body.style.overflowX = 'hidden';
             }
-        });
+        }, { passive: false });
 
         // Close menu on link click
         mobileMenu.querySelectorAll('a').forEach(link => {
-            link.addEventListener('click', function() {
+            link.addEventListener('click', function(e) {
                 hamburger.classList.remove('active');
                 mobileMenu.classList.remove('active');
-                // Force enable scroll with hidden scrollbar
                 document.body.style.overflow = 'auto';
                 document.body.style.overflowY = 'auto';
                 document.body.style.overflowX = 'hidden';
-            });
+            }, { passive: true });
         });
     }
 
     // ===============================
-    // 5. NAVIGATION SCROLL - COMPLETELY FIXED
+    // 5. NAVIGATION SCROLL - COMPLETELY OPTIMIZED
     // ===============================
     
-    // Simple scroll handler without throttling first
+    // Cache DOM elements
+    const navbar = document.getElementById('navbar') || 
+                  document.querySelector('.navbar') || 
+                  document.querySelector('nav') || 
+                  document.querySelector('.nav') ||
+                  document.querySelector('[class*="nav"]');
+    
+    const progressBar = document.querySelector('.scroll-progress') ||
+                       document.querySelector('.progress-bar') ||
+                       document.querySelector('[class*="progress"]');
+    
+    // Cached values for performance
+    let windowHeight = window.innerHeight;
+    let documentHeight = Math.max(
+        document.body.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.clientHeight,
+        document.documentElement.scrollHeight,
+        document.documentElement.offsetHeight
+    );
+    let maxScroll = documentHeight - windowHeight;
+    
+    // Optimized scroll handler with RAF
     function handleScroll() {
-        const scrolled = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+        if (isScrolling) return;
         
-        // Find navbar with multiple selectors
-        const navbar = document.getElementById('navbar') || 
-                      document.querySelector('.navbar') || 
-                      document.querySelector('nav') || 
-                      document.querySelector('.nav') ||
-                      document.querySelector('[class*="nav"]');
+        isScrolling = true;
         
-        // Find progress bar
-        const progressBar = document.querySelector('.scroll-progress') ||
-                           document.querySelector('.progress-bar') ||
-                           document.querySelector('[class*="progress"]');
+        if (animationFrame) cancelAnimationFrame(animationFrame);
         
-        // Calculate scroll percentage
-        const windowHeight = window.innerHeight;
-        const documentHeight = Math.max(
+        animationFrame = requestAnimationFrame(() => {
+            const scrolled = window.pageYOffset;
+            
+            // Calculate scroll percentage only if progress bar exists
+            if (progressBar && maxScroll > 0) {
+                const scrollPercent = Math.min((scrolled / maxScroll) * 100, 100);
+                progressBar.style.width = scrollPercent + '%';
+            }
+            
+            // Update navbar with lower threshold
+            if (navbar) {
+                if (scrolled > 50) {
+                    navbar.classList.add('scrolled');
+                } else {
+                    navbar.classList.remove('scrolled');
+                }
+            }
+            
+            isScrolling = false;
+        });
+    }
+    
+    // Add passive scroll listener
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // Update cached values on resize
+    window.addEventListener('resize', debounce(() => {
+        windowHeight = window.innerHeight;
+        documentHeight = Math.max(
             document.body.scrollHeight,
             document.body.offsetHeight,
             document.documentElement.clientHeight,
             document.documentElement.scrollHeight,
             document.documentElement.offsetHeight
         );
-        
-        const maxScroll = documentHeight - windowHeight;
-        const scrollPercent = maxScroll > 0 ? (scrolled / maxScroll) * 100 : 0;
-        
-        // Update progress bar
-        if (progressBar) {
-            progressBar.style.width = Math.min(scrollPercent, 100) + '%';
-        }
-        
-        // Update navbar
-        if (navbar) {
-            if (scrolled > 50) { // Lower threshold
-                navbar.classList.add('scrolled');
-            } else {
-                navbar.classList.remove('scrolled');
-            }
-        }
-        
-        // Debug info
-        console.log('Scroll:', scrolled, 'Progress:', scrollPercent.toFixed(1) + '%');
-    }
-    
-    // Add scroll listener immediately
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Also add to document
-    document.addEventListener('scroll', handleScroll, { passive: true });
+        maxScroll = documentHeight - windowHeight;
+    }, 250), { passive: true });
     
     // Force initial call
     handleScroll();
-    
-    // Test scroll detection
-    console.log('Scroll handlers attached. Current scroll:', window.pageYOffset);
 
     // ===============================
-    // 6. SMOOTH SCROLL - ENHANCED
+    // 6. SMOOTH SCROLL - OPTIMIZED
     // ===============================
     
-    // Test if smooth scroll works
-    function testSmoothScroll() {
-        console.log('Testing smooth scroll functionality...');
+    // Cache smooth scroll function
+    const smoothScrollTo = (target) => {
+        const targetPosition = target.getBoundingClientRect().top + window.pageYOffset;
+        const startPosition = window.pageYOffset;
+        const distance = targetPosition - startPosition;
+        const duration = 800; // Reduced for better performance
+        let start = null;
         
-        // Check CSS scroll-behavior
-        const htmlElement = document.documentElement;
-        const computedStyle = getComputedStyle(htmlElement);
-        console.log('CSS scroll-behavior:', computedStyle.scrollBehavior);
-        
-        // Manual smooth scroll function
-        function smoothScrollTo(target) {
-            const targetPosition = target.getBoundingClientRect().top + window.pageYOffset;
-            const startPosition = window.pageYOffset;
-            const distance = targetPosition - startPosition;
-            const duration = 1000;
-            let start = null;
-            
-            function animation(currentTime) {
-                if (start === null) start = currentTime;
-                const timeElapsed = currentTime - start;
-                const run = easeInOutQuad(timeElapsed, startPosition, distance, duration);
-                window.scrollTo(0, run);
-                if (timeElapsed < duration) requestAnimationFrame(animation);
-            }
-            
-            function easeInOutQuad(t, b, c, d) {
-                t /= d/2;
-                if (t < 1) return c/2*t*t + b;
-                t--;
-                return -c/2 * (t*(t-2) - 1) + b;
-            }
-            
-            requestAnimationFrame(animation);
+        function animation(currentTime) {
+            if (start === null) start = currentTime;
+            const timeElapsed = currentTime - start;
+            const run = easeInOutQuad(timeElapsed, startPosition, distance, duration);
+            window.scrollTo(0, run);
+            if (timeElapsed < duration) requestAnimationFrame(animation);
         }
         
-        // Attach to all anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const targetId = this.getAttribute('href');
-                const target = document.querySelector(targetId);
-                
-                console.log('Smooth scroll to:', targetId, target);
-                
-                if (target) {
-                    // Try native smooth scroll first
-                    if ('scrollBehavior' in document.documentElement.style) {
-                        target.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start'
-                        });
-                    } else {
-                        // Fallback to manual smooth scroll
-                        smoothScrollTo(target);
-                    }
-                } else {
-                    console.warn('Target not found:', targetId);
-                }
-            });
-        });
-    }
+        function easeInOutQuad(t, b, c, d) {
+            t /= d/2;
+            if (t < 1) return c/2*t*t + b;
+            t--;
+            return -c/2 * (t*(t-2) - 1) + b;
+        }
+        
+        requestAnimationFrame(animation);
+    };
     
-    // Initialize smooth scroll
-    testSmoothScroll();
+    // Attach to anchor links with event delegation
+    document.addEventListener('click', function(e) {
+        const anchor = e.target.closest('a[href^="#"]');
+        if (!anchor) return;
+        
+        e.preventDefault();
+        const targetId = anchor.getAttribute('href');
+        const target = document.querySelector(targetId);
+        
+        if (target) {
+            if ('scrollBehavior' in document.documentElement.style) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                smoothScrollTo(target);
+            }
+        }
+    }, { passive: false });
 
     // ===============================
-    // 7. SECTION ANIMATIONS
+    // 7. SECTION ANIMATIONS - OPTIMIZED
     // ===============================
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
+                requestAnimationFrame(() => {
+                    entry.target.classList.add('visible');
+                });
             }
         });
     }, {
@@ -1689,36 +1697,62 @@ document.addEventListener('DOMContentLoaded', function() {
         rootMargin: '0px 0px -100px 0px'
     });
 
-    document.querySelectorAll('.section').forEach(section => {
-        observer.observe(section);
+    // Use requestAnimationFrame for DOM queries
+    requestAnimationFrame(() => {
+        document.querySelectorAll('.section').forEach(section => {
+            observer.observe(section);
+        });
     });
 
     // ===============================
-    // 8. REEL VIDEOS (Simple hover)
+    // 8. REEL VIDEOS - OPTIMIZED
     // ===============================
-    document.querySelectorAll('.reel-card').forEach(card => {
+    const reelCards = document.querySelectorAll('.reel-card');
+    
+    reelCards.forEach(card => {
         const video = card.querySelector('.reel-video');
         if (video) {
+            // Preload only metadata
+            video.preload = 'metadata';
+            video.playsInline = true;
+            
+            let playPromise = null;
+            
             card.addEventListener('mouseenter', function() {
-                video.play().catch(e => console.log('Reel video play failed:', e));
-            });
+                if (playPromise) return; // Prevent multiple plays
+                
+                video.muted = true;
+                video.currentTime = 0;
+                playPromise = video.play().catch(e => {
+                    console.log('Reel video play failed:', e);
+                    playPromise = null;
+                });
+            }, { passive: true });
             
             card.addEventListener('mouseleave', function() {
-                video.pause();
-                video.currentTime = 0;
-            });
+                if (playPromise) {
+                    playPromise.then(() => {
+                        video.pause();
+                        video.currentTime = 0;
+                        playPromise = null;
+                    }).catch(() => {
+                        playPromise = null;
+                    });
+                } else {
+                    video.pause();
+                    video.currentTime = 0;
+                }
+            }, { passive: true });
         }
     });
 
     // ===============================
-    // 9. LIGHTBOX FOR IMAGES - NEW FEATURE
+    // 9. LIGHTBOX FOR IMAGES - OPTIMIZED
     // ===============================
     
-    // Create lightbox HTML
+    // Create lightbox HTML once
     function createLightbox() {
-        // Remove existing lightbox if any
-        const existingLightbox = document.getElementById('imageLightbox');
-        if (existingLightbox) existingLightbox.remove();
+        if (document.getElementById('imageLightbox')) return;
         
         const lightbox = document.createElement('div');
         lightbox.innerHTML = `
@@ -1742,10 +1776,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(lightbox);
     }
 
-    // Add lightbox styles
+    // Add lightbox styles once
     function addLightboxStyles() {
-        const existingStyle = document.getElementById('lightbox-styles');
-        if (existingStyle) existingStyle.remove();
+        if (document.getElementById('lightbox-styles')) return;
         
         const style = document.createElement('style');
         style.id = 'lightbox-styles';
@@ -1923,10 +1956,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            /* Mark images as lightbox triggers */
             .lightbox-trigger {
                 cursor: pointer;
                 transition: transform 0.2s ease, filter 0.2s ease;
+                will-change: transform, filter;
             }
             .lightbox-trigger:hover {
                 transform: scale(1.05);
@@ -1940,76 +1973,96 @@ document.addEventListener('DOMContentLoaded', function() {
     addLightboxStyles();
     createLightbox();
 
-    // Lightbox functionality
+    // Lightbox functionality with caching
     let currentImageIndex = 0;
     let lightboxImages = [];
+    let lightboxInitialized = false;
 
     function setupLightbox() {
-        // Find all images that should open in lightbox
-        const images = document.querySelectorAll('img:not(.no-lightbox):not([class*="logo"]):not([class*="icon"])');
-        lightboxImages = Array.from(images);
+        if (lightboxInitialized) return;
         
-        // Add lightbox-trigger class to images
-        lightboxImages.forEach((img, index) => {
-            img.classList.add('lightbox-trigger');
+        requestAnimationFrame(() => {
+            const images = document.querySelectorAll('img:not(.no-lightbox):not([class*="logo"]):not([class*="icon"])');
+            lightboxImages = Array.from(images);
             
-            // Add click handler
-            img.addEventListener('click', function(e) {
+            // Use event delegation instead of individual listeners
+            document.addEventListener('click', function(e) {
+                const img = e.target.closest('.lightbox-trigger');
+                if (!img) return;
+                
                 e.preventDefault();
                 e.stopPropagation();
-                openLightbox(index);
+                
+                const index = lightboxImages.indexOf(img);
+                if (index !== -1) {
+                    openLightbox(index);
+                }
+            }, { passive: false });
+            
+            // Add classes
+            lightboxImages.forEach(img => {
+                img.classList.add('lightbox-trigger');
             });
+            
+            lightboxInitialized = true;
+            console.log(`✅ Lightbox setup complete! Found ${lightboxImages.length} images`);
         });
-        
-        console.log(`✅ Lightbox setup complete! Found ${lightboxImages.length} images`);
+    }
+
+    // Cached DOM elements for lightbox
+    let lightboxElements = null;
+    
+    function getLightboxElements() {
+        if (!lightboxElements) {
+            lightboxElements = {
+                lightbox: document.getElementById('imageLightbox'),
+                img: document.getElementById('lightboxImage'),
+                title: document.getElementById('lightboxTitle'),
+                description: document.getElementById('lightboxDescription'),
+                current: document.getElementById('currentImage'),
+                total: document.getElementById('totalImages'),
+                prev: document.querySelector('.lightbox-prev'),
+                next: document.querySelector('.lightbox-next')
+            };
+        }
+        return lightboxElements;
     }
 
     function openLightbox(index) {
         currentImageIndex = index;
         const img = lightboxImages[currentImageIndex];
+        const elements = getLightboxElements();
         
-        const lightbox = document.getElementById('imageLightbox');
-        const lightboxImg = document.getElementById('lightboxImage');
-        const lightboxTitle = document.getElementById('lightboxTitle');
-        const lightboxDescription = document.getElementById('lightboxDescription');
-        const currentImageSpan = document.getElementById('currentImage');
-        const totalImagesSpan = document.getElementById('totalImages');
-        
-        if (lightbox && lightboxImg && img) {
-            // Set image
-            lightboxImg.src = img.src || img.dataset.src;
-            lightboxImg.alt = img.alt || '';
-            
-            // Set info
-            lightboxTitle.textContent = img.getAttribute('data-title') || img.alt || 'Image';
-            lightboxDescription.textContent = img.getAttribute('data-description') || '';
-            
-            // Update counter
-            currentImageSpan.textContent = currentImageIndex + 1;
-            totalImagesSpan.textContent = lightboxImages.length;
-            
-            // Show lightbox
-            lightbox.classList.add('active');
-            document.body.style.overflow = 'hidden';
-            
-            // Hide prev/next buttons if only one image
-            const prevBtn = document.querySelector('.lightbox-prev');
-            const nextBtn = document.querySelector('.lightbox-next');
-            
-            if (lightboxImages.length <= 1) {
-                prevBtn.style.display = 'none';
-                nextBtn.style.display = 'none';
-            } else {
-                prevBtn.style.display = 'flex';
-                nextBtn.style.display = 'flex';
-            }
+        if (elements.lightbox && elements.img && img) {
+            requestAnimationFrame(() => {
+                // Set image
+                elements.img.src = img.src || img.dataset.src;
+                elements.img.alt = img.alt || '';
+                
+                // Set info
+                elements.title.textContent = img.getAttribute('data-title') || img.alt || 'Image';
+                elements.description.textContent = img.getAttribute('data-description') || '';
+                
+                // Update counter
+                elements.current.textContent = currentImageIndex + 1;
+                elements.total.textContent = lightboxImages.length;
+                
+                // Show lightbox
+                elements.lightbox.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                
+                // Handle navigation buttons
+                const showNav = lightboxImages.length > 1;
+                elements.prev.style.display = showNav ? 'flex' : 'none';
+                elements.next.style.display = showNav ? 'flex' : 'none';
+            });
         }
     }
 
     function closeLightbox() {
-        const lightbox = document.getElementById('imageLightbox');
-        if (lightbox) {
-            lightbox.classList.remove('active');
+        const elements = getLightboxElements();
+        if (elements.lightbox) {
+            elements.lightbox.classList.remove('active');
             document.body.style.overflow = 'auto';
             document.body.style.overflowY = 'auto';
             document.body.style.overflowX = 'hidden';
@@ -2030,36 +2083,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Setup lightbox event listeners
+    // Setup lightbox events with event delegation
     function setupLightboxEvents() {
-        // Close button
-        const closeBtn = document.querySelector('.lightbox-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', closeLightbox);
-        }
-
-        // Overlay click
-        const overlay = document.querySelector('.lightbox-overlay');
-        if (overlay) {
-            overlay.addEventListener('click', closeLightbox);
-        }
-
-        // Navigation buttons
-        const prevBtn = document.querySelector('.lightbox-prev');
-        const nextBtn = document.querySelector('.lightbox-next');
-        
-        if (prevBtn) {
-            prevBtn.addEventListener('click', prevImage);
-        }
-        
-        if (nextBtn) {
-            nextBtn.addEventListener('click', nextImage);
-        }
+        document.addEventListener('click', function(e) {
+            if (e.target.matches('.lightbox-close')) {
+                closeLightbox();
+            } else if (e.target.matches('.lightbox-overlay')) {
+                closeLightbox();
+            } else if (e.target.matches('.lightbox-prev')) {
+                prevImage();
+            } else if (e.target.matches('.lightbox-next')) {
+                nextImage();
+            }
+        }, { passive: true });
 
         // Keyboard navigation
         document.addEventListener('keydown', function(e) {
-            const lightbox = document.getElementById('imageLightbox');
-            if (lightbox && lightbox.classList.contains('active')) {
+            const elements = getLightboxElements();
+            if (elements.lightbox && elements.lightbox.classList.contains('active')) {
                 switch(e.key) {
                     case 'Escape':
                         closeLightbox();
@@ -2072,7 +2113,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         break;
                 }
             }
-        });
+        }, { passive: true });
     }
 
     // Initialize lightbox
@@ -2080,14 +2121,12 @@ document.addEventListener('DOMContentLoaded', function() {
     setupLightboxEvents();
 
     // ===============================
-    // 10. WORK VIDEOS WITH MODAL (FIXED)
+    // 10. WORK VIDEOS WITH MODAL - OPTIMIZED
     // ===============================
     
-    // Create modal HTML
+    // Create modal HTML once
     function createModal() {
-        // Modal already exists varsa, silək
-        const existingModal = document.getElementById('videoModal');
-        if (existingModal) existingModal.remove();
+        if (document.getElementById('videoModal')) return;
         
         const modal = document.createElement('div');
         modal.innerHTML = `
@@ -2113,10 +2152,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(modal);
     }
 
-    // Add modal styles
+    // Add modal styles once
     function addModalStyles() {
-        const existingStyle = document.getElementById('modal-styles');
-        if (existingStyle) existingStyle.remove();
+        if (document.getElementById('modal-styles')) return;
         
         const style = document.createElement('style');
         style.id = 'modal-styles';
@@ -2251,120 +2289,122 @@ document.addEventListener('DOMContentLoaded', function() {
                 border: 1px solid rgba(255, 165, 0, 0.3);
             }
             
-            /* Work card hover effects */
-.works-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
-    padding: 40px;
-    max-width: 1400px;
-    margin: 0 auto;
-}
+            /* Work card hover effects - OPTIMIZED */
+            .works-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 20px;
+                padding: 40px;
+                max-width: 1400px;
+                margin: 0 auto;
+            }
 
-.work-card {
-    position: relative;
-    overflow: hidden;
-    border-radius: 12px;
-    cursor: pointer;
-    height: 300px;
-    width: 100%;
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
-}
+            .work-card {
+                position: relative;
+                overflow: hidden;
+                border-radius: 12px;
+                cursor: pointer;
+                height: 300px;
+                width: 100%;
+                transition: all 0.3s ease;
+                border: 2px solid transparent;
+                will-change: transform, border-color, box-shadow;
+            }
 
-.work-card:hover {
-    border: 2px solid #ffa500;
-    box-shadow: 0 0 20px rgba(255, 165, 0, 0.5);
-}
+            .work-card:hover {
+                border: 2px solid #ffa500;
+                box-shadow: 0 0 20px rgba(255, 165, 0, 0.5);
+            }
 
-.work-video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    border-radius: 10px;
-}
+            .work-video {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+                border-radius: 10px;
+            }
 
-.work-overlay {
-    position: absolute;
-    bottom: 20px;
-    left: 20px;
-    right: auto;
-    padding: 0;
-    transform: translateY(20px);
-    opacity: 0;
-    transition: all 0.4s ease;
-    color: white;
-    pointer-events: none;
-}
+            .work-overlay {
+                position: absolute;
+                bottom: 20px;
+                left: 20px;
+                right: auto;
+                padding: 0;
+                transform: translateY(20px);
+                opacity: 0;
+                transition: all 0.4s ease;
+                color: white;
+                pointer-events: none;
+                will-change: transform, opacity;
+            }
 
-.work-card:hover .work-overlay {
-    transform: translateY(0);
-    opacity: 1;
-}
+            .work-card:hover .work-overlay {
+                transform: translateY(0);
+                opacity: 1;
+            }
 
-.work-overlay h3 {
-    margin: 0 0 4px 0;
-    font-size: 1.2rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: #ffa500;
-    line-height: 1.2;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-}
+            .work-overlay h3 {
+                margin: 0 0 4px 0;
+                font-size: 1.2rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+                color: #ffa500;
+                line-height: 1.2;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            }
 
-.work-overlay p {
-    margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.3;
-    opacity: 1;
-    color: #ffffff;
-    font-weight: 400;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-}
+            .work-overlay p {
+                margin: 0;
+                font-size: 0.9rem;
+                line-height: 1.3;
+                opacity: 1;
+                color: #ffffff;
+                font-weight: 400;
+                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            }
 
-.play-btn {
-    display: none;
-}
+            .play-btn {
+                display: none;
+            }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .works-grid {
-        grid-template-columns: 1fr;
-        padding: 20px;
-        gap: 15px;
-    }
-    
-    .work-card {
-        height: 250px;
-    }
-    
-    .work-overlay {
-        bottom: 15px;
-        left: 15px;
-    }
-    
-    .work-overlay h3 {
-        font-size: 1rem;
-        letter-spacing: 1px;
-    }
-    
-    .work-overlay p {
-        font-size: 0.8rem;
-    }
-}
+            /* Responsive */
+            @media (max-width: 768px) {
+                .works-grid {
+                    grid-template-columns: 1fr;
+                    padding: 20px;
+                    gap: 15px;
+                }
+                
+                .work-card {
+                    height: 250px;
+                }
+                
+                .work-overlay {
+                    bottom: 15px;
+                    left: 15px;
+                }
+                
+                .work-overlay h3 {
+                    font-size: 1rem;
+                    letter-spacing: 1px;
+                }
+                
+                .work-overlay p {
+                    font-size: 0.8rem;
+                }
+            }
 
-@media (min-width: 769px) and (max-width: 1024px) {
-    .works-grid {
-        grid-template-columns: repeat(2, 1fr);
-        padding: 30px;
-    }
+            @media (min-width: 769px) and (max-width: 1024px) {
+                .works-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                    padding: 30px;
+                }
 
-    .work-card {
-        height: 280px;
-    }
-}
+                .work-card {
+                    height: 280px;
+                }
+            }
         `;
         document.head.appendChild(style);
     }
@@ -2373,55 +2413,87 @@ document.addEventListener('DOMContentLoaded', function() {
     addModalStyles();
     createModal();
 
-    // Get modal elements
-    let modal = document.getElementById('videoModal');
-    let modalVideo = document.getElementById('modalVideo');
-    let closeBtn = document.querySelector('.video-modal-close');
-    let overlay = document.querySelector('.video-modal-overlay');
-
-    // Video navigation variables
+    // Cached modal elements
+    let modalElements = null;
     let currentVideoIndex = 0;
     let modalVideos = [];
+    let modalInitialized = false;
 
-    // Work cards setup
+    function getModalElements() {
+        if (!modalElements) {
+            modalElements = {
+                modal: document.getElementById('videoModal'),
+                video: document.getElementById('modalVideo'),
+                title: document.getElementById('videoTitle'),
+                description: document.getElementById('videoDescription'),
+                current: document.getElementById('currentVideo'),
+                total: document.getElementById('totalVideos'),
+                prev: document.querySelector('.video-modal-prev'),
+                next: document.querySelector('.video-modal-next'),
+                overlay: document.querySelector('.video-modal-overlay'),
+                close: document.querySelector('.video-modal-close')
+            };
+        }
+        return modalElements;
+    }
+
+    // Work cards setup with event delegation
     function setupWorkCards() {
-        const workCards = document.querySelectorAll('.work-card');
-        modalVideos = Array.from(workCards).filter(card => card.querySelector('.work-video'));
+        if (modalInitialized) return;
         
-        workCards.forEach((card, index) => {
-            const video = card.querySelector('.work-video');
-            const overlay = card.querySelector('.work-overlay');
+        requestAnimationFrame(() => {
+            const workCards = document.querySelectorAll('.work-card');
+            modalVideos = Array.from(workCards).filter(card => card.querySelector('.work-video'));
             
-            if (video) {
-                // Hover preview effects
-                card.addEventListener('mouseenter', function() {
+            // Use event delegation for better performance
+            document.addEventListener('mouseenter', function(e) {
+                const card = e.target.closest('.work-card');
+                if (!card) return;
+                
+                const video = card.querySelector('.work-video');
+                if (video) {
                     video.muted = true;
                     video.currentTime = 0;
                     const playPromise = video.play();
                     if (playPromise !== undefined) {
                         playPromise.catch(e => console.log('Preview play failed:', e.message));
                     }
-                });
+                }
+            }, true);
 
-                card.addEventListener('mouseleave', function() {
+            document.addEventListener('mouseleave', function(e) {
+                const card = e.target.closest('.work-card');
+                if (!card) return;
+                
+                const video = card.querySelector('.work-video');
+                if (video) {
                     video.pause();
                     video.currentTime = 0;
-                });
+                }
+            }, true);
 
-                // Click to open modal
-                card.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    if (video.src || (video.querySelector('source') && video.querySelector('source').src)) {
-                        const videoIndex = modalVideos.indexOf(card);
+            // Click handler with event delegation
+            document.addEventListener('click', function(e) {
+                const card = e.target.closest('.work-card');
+                if (!card) return;
+                
+                const video = card.querySelector('.work-video');
+                if (!video) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (video.src || (video.querySelector('source') && video.querySelector('source').src)) {
+                    const videoIndex = modalVideos.indexOf(card);
+                    if (videoIndex !== -1) {
                         openVideoModal(videoIndex);
                     }
-                });
-            }
+                }
+            }, { passive: false });
+            
+            modalInitialized = true;
+            console.log(`✅ Video modal setup complete! Found ${modalVideos.length} videos`);
         });
-        
-        console.log(`✅ Video modal setup complete! Found ${modalVideos.length} videos`);
     }
 
     function openVideoModal(index) {
@@ -2433,60 +2505,46 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!video) return;
         
         const videoSrc = video.src || (video.querySelector('source') && video.querySelector('source').src);
+        const elements = getModalElements();
         
-        // Update modal elements
-        modal = document.getElementById('videoModal');
-        modalVideo = document.getElementById('modalVideo');
-        
-        if (modal && modalVideo && videoSrc) {
-            modalVideo.src = videoSrc;
-            modalVideo.muted = false;
-            modalVideo.currentTime = 0;
-            
-            // Update video info
-            const videoTitle = document.getElementById('videoTitle');
-            const videoDescription = document.getElementById('videoDescription');
-            const videoCounter = document.querySelector('.video-counter');
-            const currentVideoSpan = document.getElementById('currentVideo');
-            const totalVideosSpan = document.getElementById('totalVideos');
-            
-            if (videoTitle && overlay) {
-                const titleText = overlay.querySelector('h3')?.textContent || card.getAttribute('data-title') || 'Video';
-                videoTitle.textContent = titleText;
-            }
-            
-            if (videoDescription && overlay) {
-                const descText = overlay.querySelector('p')?.textContent || card.getAttribute('data-description') || '';
-                videoDescription.textContent = descText;
-            }
-            
-            if (currentVideoSpan && totalVideosSpan) {
-                currentVideoSpan.textContent = currentVideoIndex + 1;
-                totalVideosSpan.textContent = modalVideos.length;
-            }
-            
-            // Show/hide navigation buttons
-            const prevBtn = document.querySelector('.video-modal-prev');
-            const nextBtn = document.querySelector('.video-modal-next');
-            
-            if (modalVideos.length <= 1) {
-                if (prevBtn) prevBtn.style.display = 'none';
-                if (nextBtn) nextBtn.style.display = 'none';
-            } else {
-                if (prevBtn) prevBtn.style.display = 'flex';
-                if (nextBtn) nextBtn.style.display = 'flex';
-            }
-            
-            modal.classList.add('active');
-            document.body.style.overflow = 'hidden';
-            
-            // Play after modal opens
-            setTimeout(() => {
-                const playPromise = modalVideo.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(e => console.log('Modal play failed:', e.message));
+        if (elements.modal && elements.video && videoSrc) {
+            requestAnimationFrame(() => {
+                elements.video.src = videoSrc;
+                elements.video.muted = false;
+                elements.video.currentTime = 0;
+                
+                // Update video info
+                if (elements.title && overlay) {
+                    const titleText = overlay.querySelector('h3')?.textContent || card.getAttribute('data-title') || 'Video';
+                    elements.title.textContent = titleText;
                 }
-            }, 100);
+                
+                if (elements.description && overlay) {
+                    const descText = overlay.querySelector('p')?.textContent || card.getAttribute('data-description') || '';
+                    elements.description.textContent = descText;
+                }
+                
+                if (elements.current && elements.total) {
+                    elements.current.textContent = currentVideoIndex + 1;
+                    elements.total.textContent = modalVideos.length;
+                }
+                
+                // Show/hide navigation buttons
+                const showNav = modalVideos.length > 1;
+                elements.prev.style.display = showNav ? 'flex' : 'none';
+                elements.next.style.display = showNav ? 'flex' : 'none';
+                
+                elements.modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                
+                // Play after modal opens
+                setTimeout(() => {
+                    const playPromise = elements.video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(e => console.log('Modal play failed:', e.message));
+                    }
+                }, 100);
+            });
         }
     }
 
@@ -2506,53 +2564,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Close modal function
     function closeModal() {
-        modal = document.getElementById('videoModal');
-        modalVideo = document.getElementById('modalVideo');
+        const elements = getModalElements();
         
-        if (modal) {
-            modal.classList.remove('active');
+        if (elements.modal) {
+            elements.modal.classList.remove('active');
             document.body.style.overflow = 'auto';
             document.body.style.overflowY = 'auto';
             document.body.style.overflowX = 'hidden';
         }
         
-        if (modalVideo) {
-            modalVideo.pause();
-            modalVideo.currentTime = 0;
-            modalVideo.src = '';
+        if (elements.video) {
+            elements.video.pause();
+            elements.video.currentTime = 0;
+            elements.video.src = '';
         }
     }
 
-    // Event listeners for modal
+    // Event listeners for modal with event delegation
     function setupModalEvents() {
-        // Close button
-        const closeButton = document.querySelector('.video-modal-close');
-        if (closeButton) {
-            closeButton.addEventListener('click', closeModal);
-        }
-
-        // Overlay click
-        const modalOverlay = document.querySelector('.video-modal-overlay');
-        if (modalOverlay) {
-            modalOverlay.addEventListener('click', closeModal);
-        }
-
-        // Navigation buttons
-        const prevBtn = document.querySelector('.video-modal-prev');
-        const nextBtn = document.querySelector('.video-modal-next');
-        
-        if (prevBtn) {
-            prevBtn.addEventListener('click', prevVideo);
-        }
-        
-        if (nextBtn) {
-            nextBtn.addEventListener('click', nextVideo);
-        }
+        document.addEventListener('click', function(e) {
+            if (e.target.matches('.video-modal-close')) {
+                closeModal();
+            } else if (e.target.matches('.video-modal-overlay')) {
+                closeModal();
+            } else if (e.target.matches('.video-modal-prev')) {
+                prevVideo();
+            } else if (e.target.matches('.video-modal-next')) {
+                nextVideo();
+            }
+        }, { passive: true });
 
         // ESC key and Arrow keys
         document.addEventListener('keydown', function(e) {
-            const currentModal = document.getElementById('videoModal');
-            if (currentModal && currentModal.classList.contains('active')) {
+            const elements = getModalElements();
+            if (elements.modal && elements.modal.classList.contains('active')) {
                 switch(e.key) {
                     case 'Escape':
                         closeModal();
@@ -2565,7 +2610,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         break;
                 }
             }
-        });
+        }, { passive: true });
     }
 
     // Initialize everything
@@ -2573,29 +2618,45 @@ document.addEventListener('DOMContentLoaded', function() {
     setupModalEvents();
 
     // ===============================
-    // 11. WORK FILTERS
+    // 11. WORK FILTERS - OPTIMIZED
     // ===============================
-    const filterBtns = document.querySelectorAll('.filter-btn');
-    const workCards = document.querySelectorAll('.work-card');
+    
+    // Cache filter elements
+    let filterElements = null;
+    
+    function getFilterElements() {
+        if (!filterElements) {
+            filterElements = {
+                buttons: document.querySelectorAll('.filter-btn'),
+                cards: document.querySelectorAll('.work-card')
+            };
+        }
+        return filterElements;
+    }
+    
+    // Use event delegation for filters
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.filter-btn');
+        if (!btn) return;
+        
+        const elements = getFilterElements();
+        
+        // Remove active class from all buttons
+        elements.buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
 
-    filterBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            // Remove active class from all buttons
-            filterBtns.forEach(b => b.classList.remove('active'));
-            // Add active class to clicked button
-            btn.classList.add('active');
+        const filter = btn.getAttribute('data-filter');
 
-            const filter = btn.getAttribute('data-filter');
-
-            workCards.forEach(card => {
+        requestAnimationFrame(() => {
+            elements.cards.forEach(card => {
                 const category = card.getAttribute('data-category');
                 
                 if (filter === 'all' || category === filter) {
                     card.style.display = 'block';
-                    setTimeout(() => {
+                    requestAnimationFrame(() => {
                         card.style.opacity = '1';
                         card.style.transform = 'scale(1)';
-                    }, 10);
+                    });
                 } else {
                     card.style.opacity = '0';
                     card.style.transform = 'scale(0.8)';
@@ -2605,90 +2666,119 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
-    });
+    }, { passive: true });
 
     // ===============================
-    // 12. PARALLAX - SIMPLIFIED AND FIXED
+    // 12. PARALLAX - OPTIMIZED WITH RAF
     // ===============================
+    let parallaxFrame = null;
+    const heroVideo = document.querySelector('.hero-video');
+    
     function handleParallax() {
-        const scrolled = window.pageYOffset || document.documentElement.scrollTop || 0;
-        const heroVideo = document.querySelector('.hero-video');
+        if (parallaxFrame) return;
         
-        if (heroVideo && scrolled >= 0) {
-            const speed = 0.3; // Reduce speed for better performance
-            const yPos = -(scrolled * speed);
-            heroVideo.style.transform = `translateY(${yPos}px)`;
-        }
+        parallaxFrame = requestAnimationFrame(() => {
+            const scrolled = window.pageYOffset;
+            
+            if (heroVideo && scrolled >= 0) {
+                const speed = 0.3;
+                const yPos = -(scrolled * speed);
+                heroVideo.style.transform = `translate3d(0, ${yPos}px, 0)`;
+            }
+            
+            parallaxFrame = null;
+        });
     }
     
-    // Add parallax to scroll handler
+    // Add optimized parallax to scroll handler
     window.addEventListener('scroll', handleParallax, { passive: true });
 
     // ===============================
-    // 13. CARD STAGGER ANIMATION
+    // 13. CARD STAGGER ANIMATION - OPTIMIZED
     // ===============================
     const cardObserver = new IntersectionObserver((entries) => {
         entries.forEach((entry, index) => {
             if (entry.isIntersecting) {
+                // Use RAF for better performance
+                const delay = index * 100;
                 setTimeout(() => {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
-                }, index * 100);
+                    requestAnimationFrame(() => {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    });
+                }, delay);
+                
+                // Stop observing this element
+                cardObserver.unobserve(entry.target);
             }
         });
     }, { threshold: 0.1 });
 
-    document.querySelectorAll('.reel-card, .work-card').forEach(card => {
-        card.style.opacity = '0';
-        card.style.transform = 'translateY(30px)';
-        card.style.transition = 'all 0.6s ease';
-        cardObserver.observe(card);
+    requestAnimationFrame(() => {
+        document.querySelectorAll('.reel-card, .work-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(30px)';
+            card.style.transition = 'all 0.6s ease';
+            card.style.willChange = 'transform, opacity';
+            cardObserver.observe(card);
+        });
     });
 
     // ===============================
-    // 14. KEYBOARD NAVIGATION
+    // 14. KEYBOARD NAVIGATION - OPTIMIZED
     // ===============================
+    let keyboardFrame = null;
+    const sections = ['#home', '#reels', '#about', '#works', '#contact'];
+    
     document.addEventListener('keydown', function(e) {
-        const sections = ['#home', '#reels', '#about', '#works', '#contact'];
-        let currentSection = 0;
+        if (keyboardFrame) return;
         
-        // Find current section
-        sections.forEach((section, index) => {
-            const element = document.querySelector(section);
-            if (element) {
-                const rect = element.getBoundingClientRect();
-                if (rect.top <= 100 && rect.bottom >= 100) {
-                    currentSection = index;
+        // Check if modal is open first
+        const isModalOpen = document.querySelector('.video-modal.active') || 
+                           document.querySelector('.image-lightbox.active');
+        
+        if (isModalOpen || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+        
+        keyboardFrame = requestAnimationFrame(() => {
+            let currentSection = 0;
+            
+            // Find current section
+            sections.forEach((section, index) => {
+                const element = document.querySelector(section);
+                if (element) {
+                    const rect = element.getBoundingClientRect();
+                    if (rect.top <= 100 && rect.bottom >= 100) {
+                        currentSection = index;
+                    }
                 }
-            }
-        });
-        
-        // Navigate with arrow keys (only if no modal is open)
-        const isModalOpen = document.querySelector('.video-modal.active') || document.querySelector('.image-lightbox.active');
-        
-        if (!isModalOpen) {
+            });
+            
+            // Navigate with arrow keys
             if (e.key === 'ArrowDown' && currentSection < sections.length - 1) {
                 e.preventDefault();
                 const targetSection = document.querySelector(sections[currentSection + 1]);
                 if (targetSection) {
-                    targetSection.scrollIntoView({ behavior: 'smooth' });
+                    targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             } else if (e.key === 'ArrowUp' && currentSection > 0) {
                 e.preventDefault();
                 const targetSection = document.querySelector(sections[currentSection - 1]);
                 if (targetSection) {
-                    targetSection.scrollIntoView({ behavior: 'smooth' });
+                    targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             }
-        }
-    });
+            
+            keyboardFrame = null;
+        });
+    }, { passive: false });
 
     // ===============================
-    // 15. REAL-TIME DUST DISINTEGRATION EFFECT
+    // 15. OPTIMIZED DUST DISINTEGRATION EFFECT
     // ===============================
     let animationStarted = false;
     let particles = [];
     let letters = [];
+    let dustAnimationFrame = null;
     
     function prepareTextForDisintegration() {
         const welcomeText = document.getElementById('hero-title') || 
@@ -2701,34 +2791,50 @@ document.addEventListener('DOMContentLoaded', function() {
         welcomeText.innerHTML = '';
         letters = [];
         
-        // Her hərfi ayrı span-a çevirək
+        // Use document fragment for better performance
+        const fragment = document.createDocumentFragment();
+        
         [...text].forEach((letter, index) => {
             const span = document.createElement('span');
             span.className = 'letter-particle';
             span.textContent = letter === ' ' ? '\u00A0' : letter;
-            span.style.position = 'relative';
-            span.style.display = 'inline-block';
-            span.style.transition = 'all 0.3s ease';
+            span.style.cssText = 'position:relative;display:inline-block;transition:all 0.3s ease;will-change:transform,opacity';
             
-            welcomeText.appendChild(span);
+            fragment.appendChild(span);
             letters.push(span);
         });
+        
+        welcomeText.appendChild(fragment);
     }
     
     function startRealTimeDisintegration() {
         if (animationStarted || letters.length === 0) return;
         animationStarted = true;
         
-        // Hər hərfi soldan sağa tədricən sil və toza çevir
-        letters.forEach((letter, index) => {
-            const delay = index * 100; // Hər hərf 100ms-dən sonra
-            
-            setTimeout(() => {
-                disintegrateLetter(letter);
-            }, delay);
-        });
+        // Batch process letters for better performance
+        const batchSize = 5;
+        let currentBatch = 0;
         
-        // Wind animasiyasını başlat
+        function processBatch() {
+            const start = currentBatch * batchSize;
+            const end = Math.min(start + batchSize, letters.length);
+            
+            for (let i = start; i < end; i++) {
+                const delay = i * 100;
+                setTimeout(() => {
+                    disintegrateLetter(letters[i]);
+                }, delay);
+            }
+            
+            currentBatch++;
+            if (end < letters.length) {
+                setTimeout(processBatch, 50);
+            }
+        }
+        
+        processBatch();
+        
+        // Start wind animation
         setTimeout(() => {
             animateWindEffect();
         }, 200);
@@ -2737,77 +2843,49 @@ document.addEventListener('DOMContentLoaded', function() {
     function disintegrateLetter(letterSpan) {
         const rect = letterSpan.getBoundingClientRect();
         
-        // Canvas yaradıb hərfin şəklini götürək
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const fontSize = parseInt(getComputedStyle(letterSpan).fontSize);
-        
-        canvas.width = rect.width * 3;
-        canvas.height = rect.height * 3;
-        
-        ctx.fillStyle = getComputedStyle(letterSpan).color || '#FF9B00';
-        ctx.font = `${fontSize * 2}px ${getComputedStyle(letterSpan).fontFamily}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(letterSpan.textContent, canvas.width / 2, canvas.height / 2);
-        
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
-        
-        // Hərfi yavaş-yavaş şəffaf et
-        letterSpan.style.opacity = '0';
-        letterSpan.style.transform = 'scale(0.8)';
-        
-        // Hərf silinərkən toz parçacıqları yarat
-        const step = 4;
-        let particleCount = 0;
-        
-        for (let x = 0; x < canvas.width; x += step) {
-            for (let y = 0; y < canvas.height; y += step) {
-                const index = (y * canvas.width + x) * 4;
-                const alpha = pixels[index + 3];
-                
-                if (alpha > 50) {
-                    const particleDelay = particleCount * 2;
-                    particleCount++;
-                    
-                    setTimeout(() => {
-                        createDustParticle(
-                            rect.left + (x / 3),
-                            rect.top + (y / 3),
-                            pixels[index],     // R
-                            pixels[index + 1], // G  
-                            pixels[index + 2]  // B
-                        );
-                    }, particleDelay);
-                }
+        // Simplified particle creation
+        requestAnimationFrame(() => {
+            letterSpan.style.opacity = '0';
+            letterSpan.style.transform = 'scale(0.8)';
+            
+            // Create fewer particles for better performance
+            const particleCount = Math.min(5, Math.ceil(rect.width / 10));
+            
+            for (let i = 0; i < particleCount; i++) {
+                setTimeout(() => {
+                    createDustParticle(
+                        rect.left + Math.random() * rect.width,
+                        rect.top + Math.random() * rect.height
+                    );
+                }, i * 10);
             }
-        }
-        
-        // Hərfi tamamilə sil
-        setTimeout(() => {
-            letterSpan.style.display = 'none';
-        }, 60000);
+            
+            // Remove letter element
+            setTimeout(() => {
+                letterSpan.style.display = 'none';
+            }, 600);
+        });
     }
     
-    function createDustParticle(x, y, r = 255, g = 255, b = 255) {
+    function createDustParticle(x, y) {
         const particle = document.createElement('div');
         particle.className = 'dust-particle';
         
         const size = Math.random() * 3 + 1;
-        Object.assign(particle.style, {
-            position: 'fixed',
-            width: size + 'px',
-            height: size + 'px',
-            left: x + 'px',
-            top: y + 'px',
-            backgroundColor: `#FF9B00`,
-            borderRadius: '50%',
-            pointerEvents: 'none',
-            zIndex: '5',
-            opacity: '0.8',
-            boxShadow: `0 0 ${size}px #F9B00`
-        });
+        particle.style.cssText = `
+            position:fixed;
+            width:${size}px;
+            height:${size}px;
+            left:${x}px;
+            top:${y}px;
+            background:#FF9B00;
+            border-radius:50%;
+            pointer-events:none;
+            z-index:5;
+            opacity:0.8;
+            box-shadow:0 0 ${size}px #FF9B00;
+            will-change:transform,opacity
+        `;
         
         // Wind properties
         particle.windSpeed = Math.random() * 3 + 1;
@@ -2819,6 +2897,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         document.body.appendChild(particle);
         particles.push(particle);
+        
+        // Limit max particles for performance
+        if (particles.length > 50) {
+            const oldParticle = particles.shift();
+            if (oldParticle.parentNode) {
+                oldParticle.remove();
+            }
+        }
     }
     
     function animateWindEffect() {
@@ -2827,43 +2913,52 @@ document.addEventListener('DOMContentLoaded', function() {
         const windAnimation = () => {
             frameCount++;
             
-            particles.forEach((particle, index) => {
-                if (!particle.parentNode) return;
-                
-                const currentLeft = parseFloat(particle.style.left);
-                const currentTop = parseFloat(particle.style.top);
-                
-                // Wind movement
-                const newLeft = currentLeft + particle.windSpeed;
-                
-                // Vertical drift with turbulence
-                const turbulenceY = Math.sin(frameCount * 0.08 + index * 0.05) * particle.turbulence;
-                const newTop = currentTop + particle.verticalDrift + turbulenceY;
-                
-                // Rotation
-                particle.rotation += particle.rotationSpeed;
-                
-                particle.style.left = newLeft + 'px';
-                particle.style.top = newTop + 'px';
-                particle.style.transform = `rotate(${particle.rotation}deg)`;
-                
-                // Fade out
-                particle.life -= 0.003;
-                particle.style.opacity = Math.max(0, particle.life);
-                
-                // Remove when off screen or faded
-                if (newLeft > window.innerWidth + 50 || particle.life <= 0 || newTop > window.innerHeight + 50) {
-                    particle.remove();
-                    particles.splice(index, 1);
-                }
-            });
+            // Process particles in batches
+            const batchSize = 10;
+            const totalBatches = Math.ceil(particles.length / batchSize);
             
-            if (particles.length > 0 || frameCount < 1000) {
-                requestAnimationFrame(windAnimation);
+            for (let batch = 0; batch < totalBatches; batch++) {
+                const start = batch * batchSize;
+                const end = Math.min(start + batchSize, particles.length);
+                
+                for (let i = start; i < end; i++) {
+                    const particle = particles[i];
+                    if (!particle || !particle.parentNode) continue;
+                    
+                    const currentLeft = parseFloat(particle.style.left);
+                    const currentTop = parseFloat(particle.style.top);
+                    
+                    // Wind movement
+                    const newLeft = currentLeft + particle.windSpeed;
+                    
+                    // Vertical drift with turbulence
+                    const turbulenceY = Math.sin(frameCount * 0.08 + i * 0.05) * particle.turbulence;
+                    const newTop = currentTop + particle.verticalDrift + turbulenceY;
+                    
+                    // Rotation
+                    particle.rotation += particle.rotationSpeed;
+                    
+                    particle.style.transform = `translate3d(${newLeft}px, ${newTop}px, 0) rotate(${particle.rotation}deg)`;
+                    
+                    // Fade out
+                    particle.life -= 0.005; // Faster fade for performance
+                    particle.style.opacity = Math.max(0, particle.life);
+                    
+                    // Remove when off screen or faded
+                    if (newLeft > window.innerWidth + 50 || particle.life <= 0 || newTop > window.innerHeight + 50) {
+                        particle.remove();
+                        particles.splice(i, 1);
+                        i--; // Adjust index after removal
+                    }
+                }
+            }
+            
+            if (particles.length > 0 || frameCount < 500) { // Reduced max frames
+                dustAnimationFrame = requestAnimationFrame(windAnimation);
             }
         };
         
-        windAnimation();
+        dustAnimationFrame = requestAnimationFrame(windAnimation);
     }
     
     function startDisintegration() {
@@ -2876,91 +2971,111 @@ document.addEventListener('DOMContentLoaded', function() {
     // Start after 10 seconds
     setTimeout(startDisintegration, 10000);
     
-    // Click to start early
+    // Click to start early (one-time listener)
+    let disintegrationStarted = false;
     document.addEventListener('click', () => {
-        if (!animationStarted) {
+        if (!animationStarted && !disintegrationStarted) {
+            disintegrationStarted = true;
             startDisintegration();
         }
-    });
+    }, { once: true, passive: true });
 
     // ===============================
-    // 16. PERFORMANCE OPTIMIZATION - FIXED
+    // 16. PERFORMANCE OPTIMIZATION - ENHANCED
     // ===============================
     
-    // Preload videos with better error handling
+    // Optimized video initialization
     function initializeVideos() {
-        document.querySelectorAll('video').forEach((video, index) => {
-            video.preload = 'metadata';
-            video.playsInline = true;
-            video.setAttribute('playsinline', '');
-            
-            // Right-click context menu qarşısını alaq
-            video.addEventListener('contextmenu', e => e.preventDefault());
-            
-            // Video error handling
-            video.addEventListener('error', function(e) {
-                console.warn(`Video ${index + 1} load error:`, e);
-            });
-            
-            // Loadeddata event
-            video.addEventListener('loadeddata', function() {
-                console.log(`Video ${index + 1} loaded successfully`);
+        requestAnimationFrame(() => {
+            document.querySelectorAll('video').forEach((video, index) => {
+                video.preload = 'metadata';
+                video.playsInline = true;
+                video.setAttribute('playsinline', '');
+                
+                // Prevent context menu
+                video.addEventListener('contextmenu', e => e.preventDefault(), { passive: false });
+                
+                // Optimized error handling
+                video.addEventListener('error', function(e) {
+                    console.warn(`Video ${index + 1} load error:`, e);
+                }, { passive: true, once: true });
+                
+                // Load event
+                video.addEventListener('loadeddata', function() {
+                    console.log(`Video ${index + 1} loaded successfully`);
+                }, { passive: true, once: true });
             });
         });
     }
 
-    // Page visibility change handler
+    // Optimized page visibility handler
     document.addEventListener('visibilitychange', function() {
-        const videos = document.querySelectorAll('video');
-        
         if (document.hidden) {
-            videos.forEach(video => {
+            // Pause all videos when page hidden
+            document.querySelectorAll('video').forEach(video => {
                 if (!video.paused) {
                     video.pause();
                 }
             });
+            
+            // Cancel all animation frames
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            if (parallaxFrame) cancelAnimationFrame(parallaxFrame);
+            if (dustAnimationFrame) cancelAnimationFrame(dustAnimationFrame);
         }
-    });
+    }, { passive: true });
 
-    // Window resize handler with better mobile detection
-    const resizeHandler = debounce(function() {
-        const isMobile = window.innerWidth <= 768;
-        const hamburger = document.querySelector('.hamburger');
-        const mobileMenu = document.querySelector('.mobile-menu');
+    // Optimized window resize handler
+    const optimizedResizeHandler = () => {
+        if (resizeTimeout) clearTimeout(resizeTimeout);
         
-        if (!isMobile && hamburger && mobileMenu) {
-            hamburger.classList.remove('active');
-            mobileMenu.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-        
-        // Update custom cursor visibility
-        const cursor = document.querySelector('.custom-cursor');
-        if (cursor) {
-            cursor.style.display = isMobile ? 'none' : 'block';
-        }
-        
-        // Re-setup lightbox after resize
-        setTimeout(() => {
-            setupLightbox();
-        }, 100);
-    }, 250);
+        resizeTimeout = setTimeout(() => {
+            requestAnimationFrame(() => {
+                const isMobile = window.innerWidth <= 768;
+                const hamburger = document.querySelector('.hamburger');
+                const mobileMenu = document.querySelector('.mobile-menu');
+                
+                if (!isMobile && hamburger && mobileMenu) {
+                    hamburger.classList.remove('active');
+                    mobileMenu.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+                
+                // Update custom cursor visibility
+                const cursor = document.querySelector('.custom-cursor');
+                if (cursor) {
+                    cursor.style.display = isMobile ? 'none' : 'block';
+                }
+                
+                // Clear cached elements to refresh
+                lightboxElements = null;
+                modalElements = null;
+                filterElements = null;
+                
+                // Re-setup lightbox after resize
+                setTimeout(() => {
+                    setupLightbox();
+                }, 100);
+            });
+        }, 250);
+    };
 
-    window.addEventListener('resize', resizeHandler);
+    window.addEventListener('resize', optimizedResizeHandler, { passive: true });
 
     // Initialize videos
     initializeVideos();
 
     // ===============================
-    // SCROLL FIX - FORCE ENABLE SCROLLING + HIDE SCROLLBAR
+    // SCROLL FIX - OPTIMIZED
     // ===============================
     
-    // Add custom scrollbar styles
+    // Add custom scrollbar styles once
     function addScrollbarStyles() {
+        if (document.getElementById('custom-scrollbar-styles')) return;
+        
         const scrollbarStyle = document.createElement('style');
         scrollbarStyle.id = 'custom-scrollbar-styles';
         scrollbarStyle.textContent = `
-            /* Hide scrollbar for webkit browsers (Chrome, Safari, Edge) */
             ::-webkit-scrollbar {
                 width: 0px;
                 background: transparent;
@@ -2970,7 +3085,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 background: transparent;
             }
             
-            /* Hide scrollbar for Firefox */
             html {
                 scrollbar-width: none;
                 -ms-overflow-style: none;
@@ -2981,13 +3095,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 -ms-overflow-style: none;
             }
             
-            /* Ensure scroll functionality remains */
             html, body {
                 overflow-x: hidden !important;
                 overflow-y: auto !important;
             }
             
-            /* Alternative method for older browsers */
             body::-webkit-scrollbar {
                 display: none;
             }
@@ -2996,103 +3108,133 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Custom scrollbar styles added - scrollbar hidden!');
     }
     
-    // Force enable scrolling immediately
+    // Optimized scroll enabling
     function forceEnableScroll() {
-        // Remove any CSS that blocks scrolling
-        document.body.style.overflow = 'auto';
-        document.body.style.overflowY = 'auto';
-        document.body.style.overflowX = 'hidden';
-        document.body.style.height = 'auto';
-        document.documentElement.style.overflow = 'auto';
-        document.documentElement.style.overflowY = 'auto';
-        document.documentElement.style.overflowX = 'hidden';
-        document.documentElement.style.height = 'auto';
+        const scrollStyles = 'overflow:auto!important;overflow-y:auto!important;overflow-x:hidden!important;height:auto!important';
+        document.body.style.cssText += scrollStyles;
+        document.documentElement.style.cssText += scrollStyles;
         
-        // Remove loading class that might block scroll
         document.body.classList.remove('loading');
         document.documentElement.classList.remove('loading');
         
         console.log('✅ Scroll forcefully enabled with hidden scrollbar!');
     }
     
-    // Apply styles and enable scroll
+    // Apply optimizations immediately
     addScrollbarStyles();
     forceEnableScroll();
     
-    // Also call after DOM is ready
-    setTimeout(() => {
-        addScrollbarStyles();
-        forceEnableScroll();
-    }, 100);
-    
-    // And call after page load
+    // Cleanup and re-apply after page load
     window.addEventListener('load', () => {
-        addScrollbarStyles();
-        forceEnableScroll();
-    });
-
-    // ===============================
-    // AUTO RE-INITIALIZE LIGHTBOX WHEN IMAGES LOAD
-    // ===============================
-    
-    // Observer to detect new images
-    const imageObserver = new MutationObserver(function(mutations) {
-        let newImagesAdded = false;
-        
-        mutations.forEach(function(mutation) {
-            mutation.addedNodes.forEach(function(node) {
-                if (node.tagName === 'IMG' || (node.querySelectorAll && node.querySelectorAll('img').length > 0)) {
-                    newImagesAdded = true;
-                }
-            });
+        requestAnimationFrame(() => {
+            addScrollbarStyles();
+            forceEnableScroll();
         });
+    }, { passive: true, once: true });
+
+    // ===============================
+    // OPTIMIZED IMAGE OBSERVER
+    // ===============================
+    
+    // Debounced image observer
+    let imageObserverTimeout = null;
+    const optimizedImageObserver = new MutationObserver(function(mutations) {
+        if (imageObserverTimeout) clearTimeout(imageObserverTimeout);
         
-        if (newImagesAdded) {
-            setTimeout(() => {
-                setupLightbox();
-                console.log('🔄 Lightbox re-initialized for new images');
-            }, 100);
-        }
+        imageObserverTimeout = setTimeout(() => {
+            let newImagesAdded = false;
+            
+            mutations.forEach(function(mutation) {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.tagName === 'IMG' || (node.querySelectorAll && node.querySelectorAll('img').length > 0)) {
+                        newImagesAdded = true;
+                    }
+                });
+            });
+            
+            if (newImagesAdded) {
+                requestAnimationFrame(() => {
+                    lightboxInitialized = false; // Reset flag
+                    setupLightbox();
+                    console.log('🔄 Lightbox re-initialized for new images');
+                });
+            }
+        }, 100);
     });
     
-    // Start observing
-    imageObserver.observe(document.body, {
+    // Start observing with limited scope
+    optimizedImageObserver.observe(document.body, {
         childList: true,
-        subtree: true
+        subtree: true,
+        attributes: false,
+        characterData: false
     });
 
-    console.log('All JavaScript initialized successfully including Lightbox! 🎉');
+    // ===============================
+    // MEMORY CLEANUP
+    // ===============================
+    
+    // Cleanup function for better memory management
+    function cleanup() {
+        // Cancel all pending animation frames
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        if (parallaxFrame) cancelAnimationFrame(parallaxFrame);
+        if (dustAnimationFrame) cancelAnimationFrame(dustAnimationFrame);
+        if (keyboardFrame) cancelAnimationFrame(keyboardFrame);
+        
+        // Clear timeouts
+        if (resizeTimeout) clearTimeout(resizeTimeout);
+        if (imageObserverTimeout) clearTimeout(imageObserverTimeout);
+        
+        // Disconnect observers
+        if (observer) observer.disconnect();
+        if (cardObserver) cardObserver.disconnect();
+        if (optimizedImageObserver) optimizedImageObserver.disconnect();
+        
+        // Clear particles
+        particles.forEach(particle => {
+            if (particle.parentNode) particle.remove();
+        });
+        particles = [];
+        
+        console.log('🧹 Memory cleanup completed');
+    }
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', cleanup, { passive: true });
+    
+    console.log('All JavaScript initialized successfully with performance optimizations! 🚀');
 });
 
 // ===============================
-// UTILITY FUNCTIONS
+// OPTIMIZED UTILITY FUNCTIONS
 // ===============================
 
-// Debounce function for performance
+// High-performance debounce
 function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
         clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+        timeout = setTimeout(() => func.apply(this, args), wait);
     };
 }
 
-// Throttle function for scroll events
-function throttle(func, limit) {
-    let inThrottle;
-    return function() {
-        const args = arguments;
-        const context = this;
+// High-performance throttle with RAF
+function throttle(func, limit = 16) {
+    let inThrottle = false;
+    return function(...args) {
         if (!inThrottle) {
-            func.apply(context, args);
+            func.apply(this, args);
             inThrottle = true;
             setTimeout(() => inThrottle = false, limit);
         }
-    }
+    };
+}
+
+// Performance monitoring (optional)
+if (typeof performance !== 'undefined' && performance.mark) {
+    performance.mark('js-optimization-complete');
+    console.log('⚡ Performance monitoring active');
 }
     </script>
 </body>

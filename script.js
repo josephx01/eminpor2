@@ -1,0 +1,2220 @@
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('JavaScript loaded successfully');
+    let activeRequests = 0;
+const maxConcurrent = 3;
+const queue = [];
+
+function loadMedia(el) {
+  if (activeRequests >= maxConcurrent) {
+    queue.push(el);
+    return;
+  }
+  activeRequests++;
+  el.src = el.dataset.src;
+  if (el.tagName.toLowerCase() === "video") el.load();
+  el.addEventListener("loadeddata", () => {
+    activeRequests--;
+    if (queue.length > 0) loadMedia(queue.shift());
+  });
+}
+
+// Performance optimization variables
+let isScrolling = false;
+let resizeTimeout = null;
+let animationFrame = null;
+
+    // ===============================
+    // 1. LOADER - IMPROVED WITH HIDDEN SCROLLBAR
+    // ===============================
+    window.addEventListener('load', () => {
+        setTimeout(() => {
+            const loader = document.querySelector('.loader');
+            if (loader) {
+                loader.classList.add('fade-out');
+                document.body.classList.remove('loading');
+                
+                // Force enable scroll after loader with hidden scrollbar
+                document.body.style.overflow = 'auto';
+                document.body.style.overflowY = 'auto';
+                document.body.style.overflowX = 'hidden';
+                document.documentElement.style.overflow = 'auto';
+                document.documentElement.style.overflowX = 'hidden';
+                
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    // Double check scroll is enabled with hidden scrollbar
+                    document.body.style.overflow = 'auto';
+                    document.body.style.overflowY = 'auto';
+                    document.body.style.overflowX = 'hidden';
+                }, 500);
+            }
+        }, 3000);
+    });
+
+    // ===============================
+    // 2. WELCOME TEXT EVAPORATION - OPTIMIZED
+    // ===============================
+    function initWelcomeEvaporation() {
+        const welcomeText = document.querySelector('.hero-title') || 
+                          document.querySelector('h1') || 
+                          document.querySelector('[class*="welcome"]') ||
+                          document.querySelector('[class*="hero-title"]');
+        
+        if (welcomeText) {
+            // Split text into letters with requestAnimationFrame
+            const text = welcomeText.textContent;
+            welcomeText.innerHTML = '';
+            
+            requestAnimationFrame(() => {
+                [...text].forEach((letter, index) => {
+                    const span = document.createElement('span');
+                    span.className = 'letter';
+                    span.textContent = letter === ' ' ? '\u00A0' : letter;
+                    span.style.animationDelay = `${index * 0.05}s`;
+                    welcomeText.appendChild(span);
+                });
+            });
+            
+            // Start evaporation after 10 seconds
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    welcomeText.classList.add('evaporating');
+                });
+                
+                // Optional: Remove element completely after animation
+                setTimeout(() => {
+                    welcomeText.style.display = 'none';
+                }, 3000);
+            }, 10000);
+        }
+    }
+    
+    // Initialize welcome evaporation
+    requestAnimationFrame(() => {
+        initWelcomeEvaporation();
+    });
+
+    // ===============================
+    // 3. CUSTOM CURSOR - OPTIMIZED
+    // ===============================
+    const cursor = document.querySelector('.custom-cursor');
+    if (cursor && window.innerWidth > 480) {
+        const hoverElements = document.querySelectorAll('a, button, .reel-card, .work-card, .lightbox-trigger, img');
+        let cursorX = 0, cursorY = 0;
+        
+        // Throttled cursor movement
+        const updateCursor = throttle((e) => {
+            cursorX = e.clientX - 8;
+            cursorY = e.clientY - 8;
+            cursor.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0)`;
+        }, 16);
+        
+        document.addEventListener('mousemove', updateCursor, { passive: true });
+
+        hoverElements.forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('hover'), { passive: true });
+            el.addEventListener('mouseleave', () => cursor.classList.remove('hover'), { passive: true });
+        });
+    }
+
+    // ===============================
+    // 4. MOBILE MENU - OPTIMIZED
+    // ===============================
+    const hamburger = document.querySelector('.hamburger');
+    const mobileMenu = document.querySelector('.mobile-menu');
+    
+    if (hamburger && mobileMenu) {
+        hamburger.addEventListener('click', function(e) {
+            e.preventDefault();
+            const isActive = hamburger.classList.toggle('active');
+            mobileMenu.classList.toggle('active');
+            
+            // Only hide scroll when mobile menu is active
+            if (isActive) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = 'auto';
+                document.body.style.overflowY = 'auto';
+                document.body.style.overflowX = 'hidden';
+            }
+        }, { passive: false });
+
+        // Close menu on link click
+        mobileMenu.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                hamburger.classList.remove('active');
+                mobileMenu.classList.remove('active');
+                document.body.style.overflow = 'auto';
+                document.body.style.overflowY = 'auto';
+                document.body.style.overflowX = 'hidden';
+            }, { passive: true });
+        });
+    }
+
+    // ===============================
+    // 5. NAVIGATION SCROLL - COMPLETELY OPTIMIZED
+    // ===============================
+    
+    // Cache DOM elements
+    const navbar = document.getElementById('navbar') || 
+                  document.querySelector('.navbar') || 
+                  document.querySelector('nav') || 
+                  document.querySelector('.nav') ||
+                  document.querySelector('[class*="nav"]');
+    
+    const progressBar = document.querySelector('.scroll-progress') ||
+                       document.querySelector('.progress-bar') ||
+                       document.querySelector('[class*="progress"]');
+    
+    // Cached values for performance
+    let windowHeight = window.innerHeight;
+    let documentHeight = Math.max(
+        document.body.scrollHeight,
+        document.body.offsetHeight,
+        document.documentElement.clientHeight,
+        document.documentElement.scrollHeight,
+        document.documentElement.offsetHeight
+    );
+    let maxScroll = documentHeight - windowHeight;
+    
+   
+
+    // ===============================
+    // 6. SMOOTH SCROLL - OPTIMIZED
+    // ===============================
+    
+    // Cache smooth scroll function
+    const smoothScrollTo = (target) => {
+        const targetPosition = target.getBoundingClientRect().top + window.pageYOffset;
+        const startPosition = window.pageYOffset;
+        const distance = targetPosition - startPosition;
+        const duration = 800; // Reduced for better performance
+        let start = null;
+        
+        function animation(currentTime) {
+            if (start === null) start = currentTime;
+            const timeElapsed = currentTime - start;
+            const run = easeInOutQuad(timeElapsed, startPosition, distance, duration);
+            window.scrollTo(0, run);
+            if (timeElapsed < duration) requestAnimationFrame(animation);
+        }
+        
+        function easeInOutQuad(t, b, c, d) {
+            t /= d/2;
+            if (t < 1) return c/2*t*t + b;
+            t--;
+            return -c/2 * (t*(t-2) - 1) + b;
+        }
+        
+        requestAnimationFrame(animation);
+    };
+    
+    // Attach to anchor links with event delegation
+    document.addEventListener('click', function(e) {
+        const anchor = e.target.closest('a[href^="#"]');
+        if (!anchor) return;
+        
+        e.preventDefault();
+        const targetId = anchor.getAttribute('href');
+        const target = document.querySelector(targetId);
+        
+        if (target) {
+            if ('scrollBehavior' in document.documentElement.style) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                smoothScrollTo(target);
+            }
+        }
+    }, { passive: false });
+
+    // ===============================
+    // 7. SECTION ANIMATIONS - OPTIMIZED
+    // ===============================
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                requestAnimationFrame(() => {
+                    entry.target.classList.add('visible');
+                });
+            }
+        });
+    }, {
+        threshold: 0.15,
+        rootMargin: '0px 0px -100px 0px'
+    });
+
+    // Use requestAnimationFrame for DOM queries
+    requestAnimationFrame(() => {
+        document.querySelectorAll('.section').forEach(section => {
+            observer.observe(section);
+        });
+    });
+
+    // ===============================
+    // 8. REEL VIDEOS - OPTIMIZED
+    // ===============================
+    const reelCards = document.querySelectorAll('.reel-card');
+    
+    reelCards.forEach(card => {
+        const video = card.querySelector('.reel-video');
+        if (video) {
+            // Preload only metadata
+            video.preload = 'metadata';
+            video.playsInline = true;
+            
+            let playPromise = null;
+            
+            card.addEventListener('mouseenter', function() {
+                if (playPromise) return; // Prevent multiple plays
+                
+                video.muted = true;
+                video.currentTime = 0;
+                playPromise = video.play().catch(e => {
+                    console.log('Reel video play failed:', e);
+                    playPromise = null;
+                });
+            }, { passive: true });
+            
+            card.addEventListener('mouseleave', function() {
+                if (playPromise) {
+                    playPromise.then(() => {
+                        video.pause();
+                        video.currentTime = 0;
+                        playPromise = null;
+                    }).catch(() => {
+                        playPromise = null;
+                    });
+                } else {
+                    video.pause();
+                    video.currentTime = 0;
+                }
+            }, { passive: true });
+        }
+    });
+
+    // ===============================
+    // 9. LIGHTBOX FOR IMAGES - OPTIMIZED
+    // ===============================
+    
+    // Create lightbox HTML once
+    function createLightbox() {
+        if (document.getElementById('imageLightbox')) return;
+        
+        const lightbox = document.createElement('div');
+        lightbox.innerHTML = `
+            <div class="image-lightbox" id="imageLightbox">
+                <div class="lightbox-overlay"></div>
+                <div class="lightbox-container">
+                    <button class="lightbox-close" aria-label="Close image">&times;</button>
+                    <button class="lightbox-prev" aria-label="Previous image">&#8249;</button>
+                    <button class="lightbox-next" aria-label="Next image">&#8250;</button>
+                    <div class="lightbox-content">
+                        <img id="lightboxImage" src="" alt="" />
+                        <div class="lightbox-info">
+                            <h3 id="lightboxTitle"></h3>
+                            <p id="lightboxDescription"></p>
+                            <span class="lightbox-counter"><span id="currentImage">1</span> / <span id="totalImages">1</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(lightbox);
+    }
+
+    // Add lightbox styles once
+    function addLightboxStyles() {
+        if (document.getElementById('lightbox-styles')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'lightbox-styles';
+        style.textContent = `
+            .image-lightbox {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.95);
+                z-index: 10000;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                backdrop-filter: blur(10px);
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            }
+            .image-lightbox.active {
+                display: flex !important;
+                opacity: 1;
+            }
+            .lightbox-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                cursor: pointer;
+            }
+            .lightbox-container {
+                position: relative;
+                width: 90%;
+                max-width: 1200px;
+                max-height: 90vh;
+                z-index: 10001;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .lightbox-close {
+                position: absolute;
+                top: -60px;
+                right: 0;
+                background: #FFA500;
+                color: #000;
+                border: none;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 24px;
+                font-weight: bold;
+                z-index: 10002;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .lightbox-close:hover {
+                background: #ff8c00;
+                transform: scale(1.1);
+            }
+            .lightbox-prev, .lightbox-next {
+                position: absolute;
+                top: 50%;
+                transform: translateY(-50%);
+                background: rgba(255, 165, 0, 0.8);
+                color: #000;
+                border: none;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 24px;
+                font-weight: bold;
+                z-index: 10002;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .lightbox-prev {
+                left: -70px;
+            }
+            .lightbox-next {
+                right: -70px;
+            }
+            .lightbox-prev:hover, .lightbox-next:hover {
+                background: #FFA500;
+                transform: translateY(-50%) scale(1.1);
+            }
+            .lightbox-content {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                animation: lightboxZoomIn 0.3s ease;
+            }
+            .lightbox-content img {
+                max-width: 100%;
+                max-height: 70vh;
+                object-fit: contain;
+                border-radius: 8px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            }
+            .lightbox-info {
+                margin-top: 20px;
+                text-align: center;
+                color: white;
+                max-width: 600px;
+            }
+            .lightbox-info h3 {
+                margin: 0 0 10px 0;
+                font-size: 1.5rem;
+                color: #FFA500;
+            }
+            .lightbox-info p {
+                margin: 0 0 15px 0;
+                line-height: 1.5;
+                opacity: 0.9;
+            }
+            .lightbox-counter {
+                font-size: 0.9rem;
+                opacity: 0.7;
+                background: rgba(255, 165, 0, 0.2);
+                padding: 5px 15px;
+                border-radius: 20px;
+                border: 1px solid rgba(255, 165, 0, 0.3);
+            }
+            
+            @keyframes lightboxZoomIn {
+                from {
+                    opacity: 0;
+                    transform: scale(0.8);
+                }
+                to {
+                    opacity: 1;
+                    transform: scale(1);
+                }
+            }
+            
+            /* Mobile responsive */
+            @media (max-width: 768px) {
+                .lightbox-container {
+                    width: 95%;
+                }
+                .lightbox-close {
+                    top: -50px;
+                    right: -10px;
+                    width: 40px;
+                    height: 40px;
+                    font-size: 20px;
+                }
+                .lightbox-prev, .lightbox-next {
+                    width: 40px;
+                    height: 40px;
+                    font-size: 20px;
+                }
+                .lightbox-prev {
+                    left: -50px;
+                }
+                .lightbox-next {
+                    right: -50px;
+                }
+                .lightbox-content img {
+                    max-height: 60vh;
+                }
+                .lightbox-info h3 {
+                    font-size: 1.2rem;
+                }
+                .lightbox-info p {
+                    font-size: 0.9rem;
+                }
+            }
+            
+            .lightbox-trigger {
+                cursor: pointer;
+                transition: transform 0.2s ease, filter 0.2s ease;
+                will-change: transform, filter;
+            }
+            .lightbox-trigger:hover {
+                transform: scale(1.05);
+                filter: brightness(1.1);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Initialize lightbox
+    addLightboxStyles();
+    createLightbox();
+
+    // Lightbox functionality with caching
+    let currentImageIndex = 0;
+    let lightboxImages = [];
+    let lightboxInitialized = false;
+
+    function setupLightbox() {
+        if (lightboxInitialized) return;
+        
+        requestAnimationFrame(() => {
+            const images = document.querySelectorAll('img:not(.no-lightbox):not([class*="logo"]):not([class*="icon"])');
+            lightboxImages = Array.from(images);
+            
+            // Use event delegation instead of individual listeners
+            document.addEventListener('click', function(e) {
+                const img = e.target.closest('.lightbox-trigger');
+                if (!img) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const index = lightboxImages.indexOf(img);
+                if (index !== -1) {
+                    openLightbox(index);
+                }
+            }, { passive: false });
+            
+            // Add classes
+            lightboxImages.forEach(img => {
+                img.classList.add('lightbox-trigger');
+            });
+            
+            lightboxInitialized = true;
+            console.log(`âœ… Lightbox setup complete! Found ${lightboxImages.length} images`);
+        });
+    }
+
+    // Cached DOM elements for lightbox
+    let lightboxElements = null;
+    
+    function getLightboxElements() {
+        if (!lightboxElements) {
+            lightboxElements = {
+                lightbox: document.getElementById('imageLightbox'),
+                img: document.getElementById('lightboxImage'),
+                title: document.getElementById('lightboxTitle'),
+                description: document.getElementById('lightboxDescription'),
+                current: document.getElementById('currentImage'),
+                total: document.getElementById('totalImages'),
+                prev: document.querySelector('.lightbox-prev'),
+                next: document.querySelector('.lightbox-next')
+            };
+        }
+        return lightboxElements;
+    }
+
+    function openLightbox(index) {
+        currentImageIndex = index;
+        const img = lightboxImages[currentImageIndex];
+        const elements = getLightboxElements();
+        
+        if (elements.lightbox && elements.img && img) {
+            requestAnimationFrame(() => {
+                // Set image
+                elements.img.src = img.src || img.dataset.src;
+                elements.img.alt = img.alt || '';
+                
+                // Set info
+                elements.title.textContent = img.getAttribute('data-title') || img.alt || 'Image';
+                elements.description.textContent = img.getAttribute('data-description') || '';
+                
+                // Update counter
+                elements.current.textContent = currentImageIndex + 1;
+                elements.total.textContent = lightboxImages.length;
+                
+                // Show lightbox
+                elements.lightbox.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                
+                // Handle navigation buttons
+                const showNav = lightboxImages.length > 1;
+                elements.prev.style.display = showNav ? 'flex' : 'none';
+                elements.next.style.display = showNav ? 'flex' : 'none';
+            });
+        }
+    }
+
+    function closeLightbox() {
+        const elements = getLightboxElements();
+        if (elements.lightbox) {
+            elements.lightbox.classList.remove('active');
+            document.body.style.overflow = 'auto';
+            document.body.style.overflowY = 'auto';
+            document.body.style.overflowX = 'hidden';
+        }
+    }
+
+    function nextImage() {
+        if (lightboxImages.length > 1) {
+            currentImageIndex = (currentImageIndex + 1) % lightboxImages.length;
+            openLightbox(currentImageIndex);
+        }
+    }
+
+    function prevImage() {
+        if (lightboxImages.length > 1) {
+            currentImageIndex = currentImageIndex === 0 ? lightboxImages.length - 1 : currentImageIndex - 1;
+            openLightbox(currentImageIndex);
+        }
+    }
+
+    // Setup lightbox events with event delegation
+    function setupLightboxEvents() {
+        document.addEventListener('click', function(e) {
+            if (e.target.matches('.lightbox-close')) {
+                closeLightbox();
+            } else if (e.target.matches('.lightbox-overlay')) {
+                closeLightbox();
+            } else if (e.target.matches('.lightbox-prev')) {
+                prevImage();
+            } else if (e.target.matches('.lightbox-next')) {
+                nextImage();
+            }
+        }, { passive: true });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            const elements = getLightboxElements();
+            if (elements.lightbox && elements.lightbox.classList.contains('active')) {
+                switch(e.key) {
+                    case 'Escape':
+                        closeLightbox();
+                        break;
+                    case 'ArrowLeft':
+                        prevImage();
+                        break;
+                    case 'ArrowRight':
+                        nextImage();
+                        break;
+                }
+            }
+        }, { passive: true });
+    }
+
+    // Initialize lightbox
+    setupLightbox();
+    setupLightboxEvents();
+
+    // ===============================
+    // 10. WORK VIDEOS WITH MODAL - OPTIMIZED
+    // ===============================
+    
+    // Create modal HTML once
+    function createModal() {
+        if (document.getElementById('videoModal')) return;
+        
+        const modal = document.createElement('div');
+        modal.innerHTML = `
+            <div class="video-modal" id="videoModal">
+                <div class="video-modal-overlay"></div>
+                <div class="video-modal-container">
+                    <button class="video-modal-close" aria-label="Close video">&times;</button>
+                    <button class="video-modal-prev" aria-label="Previous video">&#8249;</button>
+                    <button class="video-modal-next" aria-label="Next video">&#8250;</button>
+                    <div class="video-modal-content">
+                        <video id="modalVideo" controls preload="metadata">
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="video-modal-info">
+                            <h3 id="videoTitle"></h3>
+                            <p id="videoDescription"></p>
+                            <span class="video-counter"><span id="currentVideo">1</span> / <span id="totalVideos">1</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // Add modal styles once
+    function addModalStyles() {
+        if (document.getElementById('modal-styles')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'modal-styles';
+        style.textContent = `
+            .video-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.95);
+                z-index: 9999;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                backdrop-filter: blur(5px);
+            }
+            .video-modal.active {
+                display: flex !important;
+            }
+            .video-modal-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                cursor: pointer;
+            }
+            .video-modal-container {
+                position: relative;
+                width: 90%;
+                max-width: 1200px;
+                max-height: 80vh;
+                z-index: 10000;
+            }
+            .video-modal-close {
+                position: absolute;
+                top: -60px;
+                right: 0;
+                background: #FFA500;
+                color: #000;
+                border: none;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 24px;
+                font-weight: bold;
+                z-index: 10002;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .video-modal-close:hover {
+                background: #ff8c00;
+                transform: scale(1.1);
+            }
+            .video-modal-prev, .video-modal-next {
+                position: absolute;
+                top: 50%;
+                transform: translateY(-50%);
+                background: rgba(255, 165, 0, 0.8);
+                color: #000;
+                border: none;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 24px;
+                font-weight: bold;
+                z-index: 10002;
+                transition: all 0.2s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .video-modal-prev {
+                left: -70px;
+            }
+            .video-modal-next {
+                right: -70px;
+            }
+            .video-modal-prev:hover, .video-modal-next:hover {
+                background: #FFA500;
+                transform: translateY(-50%) scale(1.1);
+            }
+            .video-modal-content {
+                width: 100%;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            .video-modal-content video {
+                width: 100%;
+                height: auto;
+                display: block;
+                max-height: 70vh;
+                object-fit: contain;
+                border-radius: 8px 8px 0 0;
+            }
+            .video-modal-info {
+                background: rgba(0, 0, 0, 0.8);
+                padding: 20px;
+                width: 100%;
+                text-align: center;
+                color: white;
+                border-radius: 0 0 8px 8px;
+            }
+            .video-modal-info h3 {
+                margin: 0 0 10px 0;
+                font-size: 1.5rem;
+                color: #FFA500;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .video-modal-info p {
+                margin: 0 0 15px 0;
+                line-height: 1.5;
+                opacity: 0.9;
+                font-size: 0.95rem;
+            }
+            .video-counter {
+                font-size: 0.9rem;
+                opacity: 0.7;
+                background: rgba(255, 165, 0, 0.2);
+                padding: 5px 15px;
+                border-radius: 20px;
+                border: 1px solid rgba(255, 165, 0, 0.3);
+            }
+            
+            /* Work card hover effects - OPTIMIZED */
+            .works-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 20px;
+                padding: 40px;
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+
+            .work-card {
+                position: relative;
+                overflow: hidden;
+                border-radius: 12px;
+                cursor: pointer;
+                height: 300px;
+                width: 100%;
+                transition: all 0.3s ease;
+                border: 2px solid transparent;
+                will-change: transform, border-color, box-shadow;
+            }
+
+            .work-card:hover {
+                border: 2px solid #ffa500;
+                box-shadow: 0 0 20px rgba(255, 165, 0, 0.5);
+            }
+
+            .work-video {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+                border-radius: 10px;
+            }
+
+            .work-overlay {
+                position: absolute;
+                bottom: 20px;
+                left: 20px;
+                right: auto;
+                padding: 0;
+                transform: translateY(20px);
+                opacity: 0;
+                transition: all 0.4s ease;
+                color: white;
+                pointer-events: none;
+                will-change: transform, opacity;
+            }
+
+            .work-card:hover .work-overlay {
+                transform: translateY(0);
+                opacity: 1;
+            }
+
+            .work-overlay h3 {
+                margin: 0 0 4px 0;
+                font-size: 1.2rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+                color: #ffa500;
+                line-height: 1.2;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            }
+
+            .work-overlay p {
+                margin: 0;
+                font-size: 0.9rem;
+                line-height: 1.3;
+                opacity: 1;
+                color: #ffffff;
+                font-weight: 400;
+                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            }
+
+            .play-btn {
+                display: none;
+            }
+
+            /* Responsive */
+            @media (max-width: 768px) {
+                .works-grid {
+                    grid-template-columns: 1fr;
+                    padding: 20px;
+                    gap: 15px;
+                }
+                
+                .work-card {
+                    height: 250px;
+                }
+                
+                .work-overlay {
+                    bottom: 15px;
+                    left: 15px;
+                }
+                
+                .work-overlay h3 {
+                    font-size: 1rem;
+                    letter-spacing: 1px;
+                }
+                
+                .work-overlay p {
+                    font-size: 0.8rem;
+                }
+            }
+
+            @media (min-width: 769px) and (max-width: 1024px) {
+                .works-grid {
+                    grid-template-columns: repeat(2, 1fr);
+                    padding: 30px;
+                }
+
+                .work-card {
+                    height: 280px;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Initialize modal
+    addModalStyles();
+    createModal();
+
+    // Cached modal elements
+    let modalElements = null;
+    let currentVideoIndex = 0;
+    let modalVideos = [];
+    let modalInitialized = false;
+
+    function getModalElements() {
+        if (!modalElements) {
+            modalElements = {
+                modal: document.getElementById('videoModal'),
+                video: document.getElementById('modalVideo'),
+                title: document.getElementById('videoTitle'),
+                description: document.getElementById('videoDescription'),
+                current: document.getElementById('currentVideo'),
+                total: document.getElementById('totalVideos'),
+                prev: document.querySelector('.video-modal-prev'),
+                next: document.querySelector('.video-modal-next'),
+                overlay: document.querySelector('.video-modal-overlay'),
+                close: document.querySelector('.video-modal-close')
+            };
+        }
+        return modalElements;
+    }
+
+    // Work cards setup with event delegation
+    function setupWorkCards() {
+        if (modalInitialized) return;
+        
+        requestAnimationFrame(() => {
+            const workCards = document.querySelectorAll('.work-card');
+            modalVideos = Array.from(workCards).filter(card => card.querySelector('.work-video'));
+            
+            // Use event delegation for better performance
+            document.addEventListener('mouseenter', function(e) {
+                const card = e.target.closest('.work-card');
+                if (!card) return;
+                
+                const video = card.querySelector('.work-video');
+                if (video) {
+                    video.muted = true;
+                    video.currentTime = 0;
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(e => console.log('Preview play failed:', e.message));
+                    }
+                }
+            }, true);
+
+            document.addEventListener('mouseleave', function(e) {
+                const card = e.target.closest('.work-card');
+                if (!card) return;
+                
+                const video = card.querySelector('.work-video');
+                if (video) {
+                    video.pause();
+                    video.currentTime = 0;
+                }
+            }, true);
+
+            // Click handler with event delegation
+            document.addEventListener('click', function(e) {
+                const card = e.target.closest('.work-card');
+                if (!card) return;
+                
+                const video = card.querySelector('.work-video');
+                if (!video) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (video.src || (video.querySelector('source') && video.querySelector('source').src)) {
+                    const videoIndex = modalVideos.indexOf(card);
+                    if (videoIndex !== -1) {
+                        openVideoModal(videoIndex);
+                    }
+                }
+            }, { passive: false });
+            
+            modalInitialized = true;
+            console.log(`✅ Video modal setup complete! Found ${modalVideos.length} videos`);
+        });
+    }
+
+    function openVideoModal(index) {
+        currentVideoIndex = index;
+        const card = modalVideos[currentVideoIndex];
+        const video = card.querySelector('.work-video');
+        const overlay = card.querySelector('.work-overlay');
+        
+        if (!video) return;
+        
+        const videoSrc = video.src || (video.querySelector('source') && video.querySelector('source').src);
+        const elements = getModalElements();
+        
+        if (elements.modal && elements.video && videoSrc) {
+            requestAnimationFrame(() => {
+                elements.video.src = videoSrc;
+                elements.video.muted = false;
+                elements.video.currentTime = 0;
+                
+                // Update video info
+                if (elements.title && overlay) {
+                    const titleText = overlay.querySelector('h3')?.textContent || card.getAttribute('data-title') || 'Video';
+                    elements.title.textContent = titleText;
+                }
+                
+                if (elements.description && overlay) {
+                    const descText = overlay.querySelector('p')?.textContent || card.getAttribute('data-description') || '';
+                    elements.description.textContent = descText;
+                }
+                
+                if (elements.current && elements.total) {
+                    elements.current.textContent = currentVideoIndex + 1;
+                    elements.total.textContent = modalVideos.length;
+                }
+                
+                // Show/hide navigation buttons
+                const showNav = modalVideos.length > 1;
+                elements.prev.style.display = showNav ? 'flex' : 'none';
+                elements.next.style.display = showNav ? 'flex' : 'none';
+                
+                elements.modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+                
+                // Play after modal opens
+                setTimeout(() => {
+                    const playPromise = elements.video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(e => console.log('Modal play failed:', e.message));
+                    }
+                }, 100);
+            });
+        }
+    }
+
+    function nextVideo() {
+        if (modalVideos.length > 1) {
+            currentVideoIndex = (currentVideoIndex + 1) % modalVideos.length;
+            openVideoModal(currentVideoIndex);
+        }
+    }
+
+    function prevVideo() {
+        if (modalVideos.length > 1) {
+            currentVideoIndex = currentVideoIndex === 0 ? modalVideos.length - 1 : currentVideoIndex - 1;
+            openVideoModal(currentVideoIndex);
+        }
+    }
+
+    // Close modal function
+    function closeModal() {
+        const elements = getModalElements();
+        
+        if (elements.modal) {
+            elements.modal.classList.remove('active');
+            document.body.style.overflow = 'auto';
+            document.body.style.overflowY = 'auto';
+            document.body.style.overflowX = 'hidden';
+        }
+        
+        if (elements.video) {
+            elements.video.pause();
+            elements.video.currentTime = 0;
+            elements.video.src = '';
+        }
+    }
+
+    // Event listeners for modal with event delegation
+    function setupModalEvents() {
+        document.addEventListener('click', function(e) {
+            if (e.target.matches('.video-modal-close')) {
+                closeModal();
+            } else if (e.target.matches('.video-modal-overlay')) {
+                closeModal();
+            } else if (e.target.matches('.video-modal-prev')) {
+                prevVideo();
+            } else if (e.target.matches('.video-modal-next')) {
+                nextVideo();
+            }
+        }, { passive: true });
+
+        // ESC key and Arrow keys
+        document.addEventListener('keydown', function(e) {
+            const elements = getModalElements();
+            if (elements.modal && elements.modal.classList.contains('active')) {
+                switch(e.key) {
+                    case 'Escape':
+                        closeModal();
+                        break;
+                    case 'ArrowLeft':
+                        prevVideo();
+                        break;
+                    case 'ArrowRight':
+                        nextVideo();
+                        break;
+                }
+            }
+        }, { passive: true });
+    }
+
+    // Initialize everything
+    setupWorkCards();
+    setupModalEvents();
+
+
+// ===============================
+    // SECTION VISIBILITY DETECTION FOR REELS FILTERS WITH CARD DEALING
+    // ===============================
+    
+    // Create reels filter container if it doesn't exist
+    function createReelsFiltersContainer() {
+        let container = document.querySelector('.reels-filters') || 
+                       document.querySelector('[class*="reels-filter"]') ||
+                       document.querySelector('.filter-container');
+        
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'reels-filters';
+            container.innerHTML = `
+                <button class="reels-filter-btn" data-reel-filter="yayfest">YAYFEST</button>
+                <button class="reels-filter-btn" data-reel-filter="azer">AZER AYDEMIR</button>
+                <button class="reels-filter-btn" data-reel-filter="others">OTHERS</button>
+            `;
+            document.body.appendChild(container);
+            console.log('✅ Reels filters container created automatically');
+        }
+        
+        return container;
+    }
+    
+    // Cache reels filter container
+    const reelsFiltersContainer = createReelsFiltersContainer();
+    
+    let reelsFiltersAnimated = false;
+    
+    // Function to show reels filters with card dealing animation
+    function showReelsFiltersWithAnimation() {
+        if (!reelsFiltersContainer || reelsFiltersAnimated) return;
+        
+        requestAnimationFrame(() => {
+            reelsFiltersContainer.style.display = 'flex';
+            reelsFiltersContainer.classList.add('visible');
+            
+            // Add dealing animation class
+            setTimeout(() => {
+                reelsFiltersContainer.classList.add('dealing');
+                reelsFiltersAnimated = true;
+                
+                // Remove animation class after completion
+                setTimeout(() => {
+                    reelsFiltersContainer.classList.remove('dealing');
+                }, 800);
+            }, 100);
+        });
+    }
+    
+    // Function to hide reels filters
+    function hideReelsFilters() {
+        if (!reelsFiltersContainer) return;
+        
+        requestAnimationFrame(() => {
+            reelsFiltersContainer.classList.remove('visible');
+            setTimeout(() => {
+                reelsFiltersContainer.style.display = 'none';
+            }, 300);
+        });
+        reelsFiltersAnimated = false;
+    }
+    
+    // DEBUG: Test reels section detection
+    function testReelsDetection() {
+        console.log('🔍 Testing reels detection...');
+        
+        // Test reels section selectors
+        const reelsSection = document.getElementById('reels') || 
+                           document.querySelector('.reels-section') ||
+                           document.querySelector('[class*="reels"]');
+                           
+        console.log('Reels section found:', reelsSection);
+        console.log('Reels filters container:', reelsFiltersContainer);
+        
+        if (reelsSection) {
+            const rect = reelsSection.getBoundingClientRect();
+            console.log('Reels section position:', {
+                top: rect.top,
+                bottom: rect.bottom,
+                height: rect.height
+            });
+        }
+        
+
+    }
+    
+    // Run test after page loads
+    setTimeout(testReelsDetection, 2000);
+
+    // Function to check if reels section is visible - DISABLED FOR NOW
+    function checkReelsVisibility() {
+        // TEMPORARILY DISABLED - Always show filters
+        console.log('⚠️ Visibility check disabled - filters always shown');
+        if (reelsFiltersContainer) {
+            showReelsFiltersWithAnimation();
+        }
+        return;
+        
+        const reelsSection = document.getElementById('reels') || 
+                           document.querySelector('.reels-section') ||
+                           document.querySelector('[class*="reels"]');
+        
+        console.log('🔍 Checking reels visibility...', reelsSection);
+        
+        if (!reelsSection || !reelsFiltersContainer) {
+            console.log('❌ Missing elements:', {
+                reelsSection: !!reelsSection,
+                reelsFiltersContainer: !!reelsFiltersContainer
+            });
+            return;
+        }
+        
+        const rect = reelsSection.getBoundingClientRect();
+        const windowHeight = window.innerHeight;
+        
+        // UPDATED: More flexible visibility check
+        // Show filters if section is anywhere near viewport (even if partially scrolled past)
+        const isVisible = rect.bottom > -100 && rect.top < windowHeight + 100;
+        
+        console.log('Reels visibility check:', {
+            isVisible,
+            rectTop: rect.top,
+            rectBottom: rect.bottom,
+            windowHeight
+        });
+        
+        // Show/hide reels filters based on visibility
+        if (isVisible) {
+            showReelsFiltersWithAnimation();
+        } else {
+            hideReelsFilters();
+        }
+    }
+
+    // ===============================
+    // 11. WORK FILTERS - OPTIMIZED
+    // ===============================
+    
+    // Cache filter elements
+    let filterElements = null;
+    
+    function getFilterElements() {
+        if (!filterElements) {
+            filterElements = {
+                buttons: document.querySelectorAll('.filter-btn'),
+                cards: document.querySelectorAll('.work-card')
+            };
+        }
+        return filterElements;
+    }
+    
+    // Use event delegation for filters
+    document.addEventListener('click', function(e) {
+        const btn = e.target.closest('.filter-btn');
+        if (!btn) return;
+        
+        const elements = getFilterElements();
+        
+        // Remove active class from all buttons
+        elements.buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const filter = btn.getAttribute('data-filter');
+
+        requestAnimationFrame(() => {
+            elements.cards.forEach(card => {
+                const category = card.getAttribute('data-category');
+                
+                if (filter === 'all' || category === filter) {
+                    card.style.display = 'block';
+                    requestAnimationFrame(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'scale(1)';
+                    });
+                } else {
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.8)';
+                    setTimeout(() => {
+                        card.style.display = 'none';
+                    }, 300);
+                }
+            });
+        });
+    }, { passive: true });
+
+    // ===============================
+    // 12. PARALLAX - OPTIMIZED WITH RAF
+    // ===============================
+    let parallaxFrame = null;
+    const heroVideo = document.querySelector('.hero-video');
+    
+    function handleParallax() {
+        if (parallaxFrame) return;
+        
+        parallaxFrame = requestAnimationFrame(() => {
+            const scrolled = window.pageYOffset;
+            
+            if (heroVideo && scrolled >= 0) {
+                const speed = 0.3;
+                const yPos = -(scrolled * speed);
+                heroVideo.style.transform = `translate3d(0, ${yPos}px, 0)`;
+            }
+            
+            parallaxFrame = null;
+        });
+    }
+    
+    // Add optimized parallax to scroll handler
+    window.addEventListener('scroll', handleParallax, { passive: true });
+
+    // ===============================
+    // 13. CARD STAGGER ANIMATION - OPTIMIZED
+    // ===============================
+    const cardObserver = new IntersectionObserver((entries) => {
+        entries.forEach((entry, index) => {
+            if (entry.isIntersecting) {
+                // Use RAF for better performance
+                const delay = index * 100;
+                setTimeout(() => {
+                    requestAnimationFrame(() => {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    });
+                }, delay);
+                
+                // Stop observing this element
+                cardObserver.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.1 });
+
+    requestAnimationFrame(() => {
+        document.querySelectorAll('.reel-card, .work-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(30px)';
+            card.style.transition = 'all 0.6s ease';
+            card.style.willChange = 'transform, opacity';
+            cardObserver.observe(card);
+        });
+    });
+
+    // ===============================
+    // 14. KEYBOARD NAVIGATION - OPTIMIZED
+    // ===============================
+    let keyboardFrame = null;
+    const sections = ['#home', '#reels', '#about', '#works', '#contact'];
+    
+    document.addEventListener('keydown', function(e) {
+        if (keyboardFrame) return;
+        
+        // Check if modal is open first
+        const isModalOpen = document.querySelector('.video-modal.active') || 
+                           document.querySelector('.image-lightbox.active');
+        
+        if (isModalOpen || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+        
+        keyboardFrame = requestAnimationFrame(() => {
+            let currentSection = 0;
+            
+            // Find current section
+            sections.forEach((section, index) => {
+                const element = document.querySelector(section);
+                if (element) {
+                    const rect = element.getBoundingClientRect();
+                    if (rect.top <= 100 && rect.bottom >= 100) {
+                        currentSection = index;
+                    }
+                }
+            });
+            
+            // Navigate with arrow keys
+            if (e.key === 'ArrowDown' && currentSection < sections.length - 1) {
+                e.preventDefault();
+                const targetSection = document.querySelector(sections[currentSection + 1]);
+                if (targetSection) {
+                    targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            } else if (e.key === 'ArrowUp' && currentSection > 0) {
+                e.preventDefault();
+                const targetSection = document.querySelector(sections[currentSection - 1]);
+                if (targetSection) {
+                    targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+            
+            keyboardFrame = null;
+        });
+    }, { passive: false });
+
+    // ===============================
+    // 15. OPTIMIZED DUST DISINTEGRATION EFFECT
+    // ===============================
+    let animationStarted = false;
+    let particles = [];
+    let letters = [];
+    let dustAnimationFrame = null;
+    
+    function prepareTextForDisintegration() {
+        const welcomeText = document.getElementById('hero-title') || 
+                           document.querySelector('.hero-title') ||
+                           document.querySelector('h1');
+        
+        if (!welcomeText) return;
+        
+        const text = welcomeText.textContent;
+        welcomeText.innerHTML = '';
+        letters = [];
+        
+        // Use document fragment for better performance
+        const fragment = document.createDocumentFragment();
+        
+        [...text].forEach((letter, index) => {
+            const span = document.createElement('span');
+            span.className = 'letter-particle';
+            span.textContent = letter === ' ' ? '\u00A0' : letter;
+            span.style.cssText = 'position:relative;display:inline-block;transition:all 0.3s ease;will-change:transform,opacity';
+            
+            fragment.appendChild(span);
+            letters.push(span);
+        });
+        
+        welcomeText.appendChild(fragment);
+    }
+    
+    function startRealTimeDisintegration() {
+        if (animationStarted || letters.length === 0) return;
+        animationStarted = true;
+        
+        // Batch process letters for better performance
+        const batchSize = 5;
+        let currentBatch = 0;
+        
+        function processBatch() {
+            const start = currentBatch * batchSize;
+            const end = Math.min(start + batchSize, letters.length);
+            
+            for (let i = start; i < end; i++) {
+                const delay = i * 100;
+                setTimeout(() => {
+                    disintegrateLetter(letters[i]);
+                }, delay);
+            }
+            
+            currentBatch++;
+            if (end < letters.length) {
+                setTimeout(processBatch, 50);
+            }
+        }
+        
+        processBatch();
+        
+        // Start wind animation
+        setTimeout(() => {
+            animateWindEffect();
+        }, 200);
+    }
+    
+    function disintegrateLetter(letterSpan) {
+        const rect = letterSpan.getBoundingClientRect();
+        
+        // Simplified particle creation
+        requestAnimationFrame(() => {
+            letterSpan.style.opacity = '0';
+            letterSpan.style.transform = 'scale(0.8)';
+            
+            // Create fewer particles for better performance
+            const particleCount = Math.min(5, Math.ceil(rect.width / 10));
+            
+            for (let i = 0; i < particleCount; i++) {
+                setTimeout(() => {
+                    createDustParticle(
+                        rect.left + Math.random() * rect.width,
+                        rect.top + Math.random() * rect.height
+                    );
+                }, i * 10);
+            }
+            
+            // Remove letter element
+            setTimeout(() => {
+                letterSpan.style.display = 'none';
+            }, 600);
+        });
+    }
+    
+    function createDustParticle(x, y) {
+        const particle = document.createElement('div');
+        particle.className = 'dust-particle';
+        
+        const size = Math.random() * 3 + 1;
+        particle.style.cssText = `
+            position:fixed;
+            width:${size}px;
+            height:${size}px;
+            left:${x}px;
+            top:${y}px;
+            background:#FF9B00;
+            border-radius:50%;
+            pointer-events:none;
+            z-index:5;
+            opacity:0.8;
+            box-shadow:0 0 ${size}px #FF9B00;
+            will-change:transform,opacity
+        `;
+        
+        // Wind properties
+        particle.windSpeed = Math.random() * 3 + 1;
+        particle.verticalDrift = (Math.random() - 0.5) * 0.5;
+        particle.turbulence = Math.random() * 0.3;
+        particle.life = 1.0;
+        particle.rotation = Math.random() * 360;
+        particle.rotationSpeed = (Math.random() - 0.5) * 5;
+        
+        document.body.appendChild(particle);
+        particles.push(particle);
+        
+        // Limit max particles for performance
+        if (particles.length > 50) {
+            const oldParticle = particles.shift();
+            if (oldParticle.parentNode) {
+                oldParticle.remove();
+            }
+        }
+    }
+    
+    function animateWindEffect() {
+        let frameCount = 0;
+        
+        const windAnimation = () => {
+            frameCount++;
+            
+            // Process particles in batches
+            const batchSize = 10;
+            const totalBatches = Math.ceil(particles.length / batchSize);
+            
+            for (let batch = 0; batch < totalBatches; batch++) {
+                const start = batch * batchSize;
+                const end = Math.min(start + batchSize, particles.length);
+                
+                for (let i = start; i < end; i++) {
+                    const particle = particles[i];
+                    if (!particle || !particle.parentNode) continue;
+                    
+                    const currentLeft = parseFloat(particle.style.left);
+                    const currentTop = parseFloat(particle.style.top);
+                    
+                    // Wind movement
+                    const newLeft = currentLeft + particle.windSpeed;
+                    
+                    // Vertical drift with turbulence
+                    const turbulenceY = Math.sin(frameCount * 0.08 + i * 0.05) * particle.turbulence;
+                    const newTop = currentTop + particle.verticalDrift + turbulenceY;
+                    
+                    // Rotation
+                    particle.rotation += particle.rotationSpeed;
+                    
+                    particle.style.transform = `translate3d(${newLeft}px, ${newTop}px, 0) rotate(${particle.rotation}deg)`;
+                    
+                    // Fade out
+                    particle.life -= 0.005; // Faster fade for performance
+                    particle.style.opacity = Math.max(0, particle.life);
+                    
+                    // Remove when off screen or faded
+                    if (newLeft > window.innerWidth + 50 || particle.life <= 0 || newTop > window.innerHeight + 50) {
+                        particle.remove();
+                        particles.splice(i, 1);
+                        i--; // Adjust index after removal
+                    }
+                }
+            }
+            
+            if (particles.length > 0 || frameCount < 500) { // Reduced max frames
+                dustAnimationFrame = requestAnimationFrame(windAnimation);
+            }
+        };
+        
+        dustAnimationFrame = requestAnimationFrame(windAnimation);
+    }
+    
+    function startDisintegration() {
+        prepareTextForDisintegration();
+        setTimeout(() => {
+            startRealTimeDisintegration();
+        }, 100);
+    }
+    
+    // Start after 10 seconds
+    setTimeout(startDisintegration, 10000);
+    
+    // Click to start early (one-time listener)
+    let disintegrationStarted = false;
+    document.addEventListener('click', () => {
+        if (!animationStarted && !disintegrationStarted) {
+            disintegrationStarted = true;
+            startDisintegration();
+        }
+    }, { once: true, passive: true });
+
+    // ===============================
+    // 16. PERFORMANCE OPTIMIZATION - ENHANCED
+    // ===============================
+    
+    // Optimized video initialization
+    function initializeVideos() {
+        requestAnimationFrame(() => {
+            document.querySelectorAll('video').forEach((video, index) => {
+                video.preload = 'metadata';
+                video.playsInline = true;
+                video.setAttribute('playsinline', '');
+                
+                // Prevent context menu
+                video.addEventListener('contextmenu', e => e.preventDefault(), { passive: false });
+                
+                // Optimized error handling
+                video.addEventListener('error', function(e) {
+                    console.warn(`Video ${index + 1} load error:`, e);
+                }, { passive: true, once: true });
+                
+                // Load event
+                video.addEventListener('loadeddata', function() {
+                    console.log(`Video ${index + 1} loaded successfully`);
+                }, { passive: true, once: true });
+            });
+        });
+    }
+
+    // Optimized page visibility handler
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            // Pause all videos when page hidden
+            document.querySelectorAll('video').forEach(video => {
+                if (!video.paused) {
+                    video.pause();
+                }
+            });
+            
+            // Cancel all animation frames
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            if (parallaxFrame) cancelAnimationFrame(parallaxFrame);
+            if (dustAnimationFrame) cancelAnimationFrame(dustAnimationFrame);
+        }
+    }, { passive: true });
+
+    // Optimized window resize handler
+    const optimizedResizeHandler = () => {
+        if (resizeTimeout) clearTimeout(resizeTimeout);
+        
+        resizeTimeout = setTimeout(() => {
+            requestAnimationFrame(() => {
+                const isMobile = window.innerWidth <= 768;
+                const hamburger = document.querySelector('.hamburger');
+                const mobileMenu = document.querySelector('.mobile-menu');
+                
+                if (!isMobile && hamburger && mobileMenu) {
+                    hamburger.classList.remove('active');
+                    mobileMenu.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+                
+                // Update custom cursor visibility
+                const cursor = document.querySelector('.custom-cursor');
+                if (cursor) {
+                    cursor.style.display = isMobile ? 'none' : 'block';
+                }
+                
+                // Clear cached elements to refresh
+                lightboxElements = null;
+                modalElements = null;
+                filterElements = null;
+                
+                // Re-setup lightbox after resize
+                setTimeout(() => {
+                    setupLightbox();
+                }, 100);
+                
+                // Recheck reels visibility after resize
+                checkReelsVisibility();
+            });
+        }, 250);
+    };
+
+    window.addEventListener('resize', optimizedResizeHandler, { passive: true });
+
+    // Initialize videos
+    initializeVideos();
+
+    // ===============================
+    // SCROLL FIX - OPTIMIZED
+    // ===============================
+    
+    // Add custom scrollbar styles once
+    function addScrollbarStyles() {
+        if (document.getElementById('custom-scrollbar-styles')) return;
+        
+        const scrollbarStyle = document.createElement('style');
+        scrollbarStyle.id = 'custom-scrollbar-styles';
+        scrollbarStyle.textContent = `
+            ::-webkit-scrollbar {
+                width: 0px;
+                background: transparent;
+            }
+            
+            ::-webkit-scrollbar-thumb {
+                background: transparent;
+            }
+            
+            html {
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            
+            body {
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+            
+            html, body {
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+            }
+            
+            body::-webkit-scrollbar {
+                display: none;
+            }
+        `;
+        document.head.appendChild(scrollbarStyle);
+        console.log('✅ Custom scrollbar styles added - scrollbar hidden!');
+    }
+    
+    // Optimized scroll enabling
+    function forceEnableScroll() {
+        const scrollStyles = 'overflow:auto!important;overflow-y:auto!important;overflow-x:hidden!important;height:auto!important';
+        document.body.style.cssText += scrollStyles;
+        document.documentElement.style.cssText += scrollStyles;
+        
+        document.body.classList.remove('loading');
+        document.documentElement.classList.remove('loading');
+        
+        console.log('✅ Scroll forcefully enabled with hidden scrollbar!');
+    }
+    
+    // Apply optimizations immediately
+    addScrollbarStyles();
+    forceEnableScroll();
+    
+    // Cleanup and re-apply after page load
+    window.addEventListener('load', () => {
+        requestAnimationFrame(() => {
+            addScrollbarStyles();
+            forceEnableScroll();
+        });
+    }, { passive: true, once: true });
+
+    // ===============================
+    // OPTIMIZED IMAGE OBSERVER
+    // ===============================
+    
+    // Debounced image observer
+    let imageObserverTimeout = null;
+    const optimizedImageObserver = new MutationObserver(function(mutations) {
+        if (imageObserverTimeout) clearTimeout(imageObserverTimeout);
+        
+        imageObserverTimeout = setTimeout(() => {
+            let newImagesAdded = false;
+            
+            mutations.forEach(function(mutation) {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.tagName === 'IMG' || (node.querySelectorAll && node.querySelectorAll('img').length > 0)) {
+                        newImagesAdded = true;
+                    }
+                });
+            });
+            
+            if (newImagesAdded) {
+                requestAnimationFrame(() => {
+                    lightboxInitialized = false; // Reset flag
+                    setupLightbox();
+                    console.log('🔄 Lightbox re-initialized for new images');
+                });
+            }
+        }, 100);
+    });
+    
+    // Start observing with limited scope
+    optimizedImageObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: false,
+        characterData: false
+    });
+
+    // ===============================
+    // MEMORY CLEANUP
+    // ===============================
+    
+    // Cleanup function for better memory management
+    function cleanup() {
+        // Cancel all pending animation frames
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        if (parallaxFrame) cancelAnimationFrame(parallaxFrame);
+        if (dustAnimationFrame) cancelAnimationFrame(dustAnimationFrame);
+        if (keyboardFrame) cancelAnimationFrame(keyboardFrame);
+        
+        // Clear timeouts
+        if (resizeTimeout) clearTimeout(resizeTimeout);
+        if (imageObserverTimeout) clearTimeout(imageObserverTimeout);
+        
+        // Disconnect observers
+        if (observer) observer.disconnect();
+        if (cardObserver) cardObserver.disconnect();
+        if (optimizedImageObserver) optimizedImageObserver.disconnect();
+        
+        // Clear particles
+        particles.forEach(particle => {
+            if (particle.parentNode) particle.remove();
+        });
+        particles = [];
+        
+        console.log('🧹 Memory cleanup completed');
+    }
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', cleanup, { passive: true });
+    
+    console.log('All JavaScript initialized successfully with performance optimizations! 🚀');
+     // First, let's modify the existing checkReelsVisibility function to work with navigation
+
+    // REPLACE EXISTING FORCE SHOW CODE with navigation-controlled visibility
+    
+   
+
+    // Add enhanced CSS styles for reels filters
+    function addEnhancedReelsFilterStyles() {
+        if (document.getElementById('enhanced-reels-filter-styles')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'enhanced-reels-filter-styles';
+        style.textContent = `
+            .reels-filters {
+                display: none;
+                justify-content: center;
+                align-items: center;
+                gap: 20px;
+                padding: 20px 0;
+                background: rgba(0, 0, 0, 0.9);
+                backdrop-filter: blur(15px);
+                position: sticky;
+                top: 80px;
+                z-index: 100;
+                border-bottom: 2px solid rgba(255, 165, 0, 0.3);
+                margin: 0;
+                opacity: 0;
+                transform: translateY(-30px);
+                transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            }
+            
+            .reels-filters.visible {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            
+            .reels-filter-btn {
+                background: transparent;
+                border: 2px solid rgba(255, 165, 0, 0.6);
+                color: #ffffff;
+                padding: 12px 24px;
+                border-radius: 30px;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 700;
+                letter-spacing: 1.5px;
+                text-transform: uppercase;
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                position: relative;
+                overflow: hidden;
+                backdrop-filter: blur(5px);
+                font-family: inherit;
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            
+            .reels-filter-btn::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: -100%;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(90deg, transparent, rgba(255, 165, 0, 0.2), transparent);
+                transition: left 0.6s ease;
+            }
+            
+            .reels-filter-btn:hover::before {
+                left: 100%;
+            }
+            
+            .reels-filter-btn:hover {
+                border-color: #FFA500;
+                background: rgba(255, 165, 0, 0.15);
+                transform: translateY(-3px) scale(1.02);
+                box-shadow: 0 8px 25px rgba(255, 165, 0, 0.4);
+            }
+            
+            .reels-filter-btn.active {
+                background: linear-gradient(45deg, #FFA500, #ff8c00);
+                color: #000000;
+                border-color: #FFA500;
+                box-shadow: 0 8px 30px rgba(255, 165, 0, 0.5);
+                font-weight: 800;
+                transform: translateY(0) scale(1.05);
+            }
+            
+            .reels-filter-btn.active::before {
+                display: none;
+            }
+            
+            /* Stagger animation for buttons */
+            .reels-filters.dealing .reels-filter-btn:nth-child(1) {
+                animation: filterSlideIn 0.4s ease forwards;
+                animation-delay: 0ms;
+            }
+            
+            .reels-filters.dealing .reels-filter-btn:nth-child(2) {
+                animation: filterSlideIn 0.4s ease forwards;
+                animation-delay: 100ms;
+            }
+            
+            .reels-filters.dealing .reels-filter-btn:nth-child(3) {
+                animation: filterSlideIn 0.4s ease forwards;
+                animation-delay: 200ms;
+            }
+            
+            .reels-filters.dealing .reels-filter-btn:nth-child(4) {
+                animation: filterSlideIn 0.4s ease forwards;
+                animation-delay: 300ms;
+            }
+            
+            /* Mobile responsive */
+            @media (max-width: 768px) {
+                .reels-filters {
+                    gap: 12px;
+                    padding: 15px 10px;
+                    top: 60px;
+                    flex-wrap: wrap;
+                }
+                
+                .reels-filter-btn {
+                    padding: 10px 18px;
+                    font-size: 11px;
+                    letter-spacing: 1px;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .reels-filters {
+                    gap: 8px;
+                    padding: 12px 5px;
+                }
+                
+                .reels-filter-btn {
+                    padding: 8px 15px;
+                    font-size: 10px;
+                    letter-spacing: 0.5px;
+                    border-radius: 20px;
+                }
+            }
+            
+            /* Animation keyframes */
+            @keyframes filterSlideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-20px) scale(0.8);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                }
+            }
+            
+            /* Card filter transitions */
+            .reel-card {
+                transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            
+            .reel-card[style*="opacity: 0"] {
+                pointer-events: none;
+            }
+        `;
+        
+        document.head.appendChild(style);
+        console.log('🎨 Enhanced reels filter styles added');
+    }
+    
+    // Add styles
+    addEnhancedReelsFilterStyles();
+    
+    // Manual testing functions (only in development)
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        window.testShowReelsFilters = function() {
+            if (reelsFiltersContainer) {
+                reelsFiltersContainer.style.display = 'flex';
+                reelsFiltersContainer.classList.add('visible');
+                console.log('🧪 Test: Reels filters shown manually');
+            }
+        };
+        
+        window.testHideReelsFilters = function() {
+            if (reelsFiltersContainer) {
+                reelsFiltersContainer.classList.remove('visible');
+                setTimeout(() => {
+                    reelsFiltersContainer.style.display = 'none';
+                }, 300);
+                console.log('🧪 Test: Reels filters hidden manually');
+            }
+        };
+        
+        console.log('🧪 Test functions available: testShowReelsFilters(), testHideReelsFilters()');
+    }
+});
+
+// ===============================
+// OPTIMIZED UTILITY FUNCTIONS
+// ===============================
+
+// High-performance debounce
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// High-performance throttle with RAF
+function throttle(func, limit = 16) {
+    let inThrottle = false;
+    return function(...args) {
+        if (!inThrottle) {
+            func.apply(this, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+
+// Performance monitoring (optional)
+if (typeof performance !== 'undefined' && performance.mark) {
+    performance.mark('js-optimization-complete');
+    console.log('⚡ Performance monitoring active');
+/* === GLOBAL LAZY LOAD FOR ALL MEDIA === */
+(function () {
+  // Helper: element hansı section/card-a aiddir?
+  function getCategory(el) {
+    const card = el.closest('[data-category], [data-reel-category], [data-type]');
+    return (
+      (card && (card.dataset.category || card.dataset.reelCategory || card.dataset.type)) ||
+      ''
+    ).toLowerCase();
+  }
+
+  // Bütün img/video/iframe-lərin src-lərini data-src-ə daşı
+  function prepareLazyMedia() {
+    document.querySelectorAll('img, video, iframe').forEach((media) => {
+      if (media.dataset.src) return; // artıq hazırlanıbsa keç
+
+      // src varsa onu data-src-ə daşı
+      const current =
+        media.currentSrc ||
+        media.getAttribute('src') ||
+        (media.querySelector('source') && media.querySelector('source').src);
+      if (current) {
+        media.dataset.src = current;
+        media.removeAttribute('src');
+
+        // video/iframe üçün source taglarını da təmizlə
+        media.querySelectorAll('source').forEach((s) => s.remove());
+        if (media.tagName.toLowerCase() === 'video') {
+          media.load();
+        }
+      }
+    });
+  }
+
+  // Media yükləmə funksiyası
+  function loadMediaForCategory(category) {
+    document.querySelectorAll('img[data-src], video[data-src], iframe[data-src]').forEach((media) => {
+      const cat = getCategory(media);
+      if (cat.includes(category) || category === 'all') {
+        if (!media.src) {
+          media.src = media.dataset.src;
+          if (media.tagName.toLowerCase() === 'video') {
+            media.load();
+          }
+        }
+      }
+    });
+  }
+
+  // İlk girişdə hazırla və yalnız reels media-nı yüklə
+  prepareLazyMedia();
+  loadMediaForCategory('reels');
+
+  // Section dəyişəndə uyğun media-nı yüklə
+  document.addEventListener('click', (e) => {
+    const navBtn = e.target.closest('a, button');
+    if (!navBtn) return;
+
+    let section =
+      navBtn.getAttribute('data-section') ||
+      navBtn.getAttribute('data-filter') ||
+      navBtn.getAttribute('href') ||
+      navBtn.textContent.toLowerCase().trim();
+
+    if (section && section.includes('#')) {
+      section = section.replace('#', '');
+    }
+
+    if (section) {
+      loadMediaForCategory(section.toLowerCase());
+    }
+  });
+
+  // Hash dəyişəndə də işləsin
+  window.addEventListener('hashchange', () => {
+    const hash = window.location.hash.replace('#', '').toLowerCase();
+    if (hash) {
+      loadMediaForCategory(hash);
+    }
+  });
+})();
+window.addEventListener('DOMContentLoaded', () => {
+    const reelsFilterBtn = document.querySelector('.filter-btn[data-filter="reels"]');
+    if (reelsFilterBtn) {
+        reelsFilterBtn.click(); // sanki istifadəçi klik edib
+    }
+});
+window.addEventListener('load', () => {
+    const reelsSection = document.querySelector('.reels-container');
+    const reelsFilters = document.querySelector('.reels-filters');
+
+    if (reelsSection) {
+        reelsSection.style.display = 'block';
+        reelsSection.classList.add('visible');
+    }
+    if (reelsFilters) {
+        reelsFilters.style.display = 'flex';
+        reelsFilters.classList.add('visible');
+    }
+
+    console.log('✅ Forced Reels section & filters to always be visible');
+});
+}

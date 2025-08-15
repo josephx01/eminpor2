@@ -1300,62 +1300,302 @@ let animationFrame = null;
         }
     }
 
-    // ===============================
-    // 11. WORK FILTERS - OPTIMIZED
-    // ===============================
+// ===============================
+// 11. ENHANCED WORK FILTERS WITH SUBFILTERS - OPTIMIZED
+// (Featured Reels Always Visible)
+// ===============================
+
+// Cache filter elements
+let filterElements = null;
+let currentMainFilter = 'reels'; // Default main filter
+let currentSubFilter = 'yayfest'; // Default sub filter
+
+function getFilterElements() {
+    if (!filterElements) {
+        filterElements = {
+            buttons: document.querySelectorAll('.filter-btn'),
+            cards: document.querySelectorAll('.work-card'),
+            // Only select work-cards that are NOT in featured reels section
+            filterableCards: document.querySelectorAll('.works-section .work-card, .work-cards .work-card, [class*="work"]:not([class*="featured"]) .work-card'),
+            reelsSubfilters: document.querySelector('.reels-filters'),
+            reelsFilterBtns: document.querySelectorAll('.reels-filter-btn'),
+            featuredReelsCards: document.querySelectorAll('.featured-reels .work-card, [class*="featured"] .work-card')
+        };
+    }
+    return filterElements;
+}
+
+// Enhanced media loading function
+function loadMediaForFilter(mainFilter, subFilter = null) {
+    const elements = getFilterElements();
     
-    // Cache filter elements
-    let filterElements = null;
-    
-    function getFilterElements() {
-        if (!filterElements) {
-            filterElements = {
-                buttons: document.querySelectorAll('.filter-btn'),
-                cards: document.querySelectorAll('.work-card')
-            };
+    // Always load media for featured reels (they should always be visible)
+    elements.featuredReelsCards.forEach(card => {
+        const media = card.querySelector('img[data-src], video[data-src]');
+        if (media && media.dataset.src && !media.src) {
+            media.src = media.dataset.src;
+            if (media.tagName.toLowerCase() === 'video') {
+                media.load();
+            }
         }
-        return filterElements;
+    });
+    
+    // Load media for filterable cards
+    elements.filterableCards.forEach(card => {
+        const category = card.getAttribute('data-category');
+        const subcategory = card.getAttribute('data-subcategory');
+        
+        let shouldLoad = false;
+        
+        if (mainFilter === 'reels' && subFilter) {
+            shouldLoad = category === 'reels' && subcategory === subFilter;
+        } else {
+            shouldLoad = category === mainFilter;
+        }
+        
+        if (shouldLoad) {
+            // Load media if not already loaded
+            const media = card.querySelector('img[data-src], video[data-src]');
+            if (media && media.dataset.src && !media.src) {
+                media.src = media.dataset.src;
+                if (media.tagName.toLowerCase() === 'video') {
+                    media.load();
+                }
+                console.log(`📁 Loaded media for ${mainFilter}${subFilter ? '-' + subFilter : ''}`);
+            }
+        }
+    });
+}
+
+// Show/hide cards based on filters (Featured Reels always visible)
+function filterCards(mainFilter, subFilter = null) {
+    const elements = getFilterElements();
+    
+    requestAnimationFrame(() => {
+        // Keep featured reels always visible
+        elements.featuredReelsCards.forEach(card => {
+            card.style.display = 'block';
+            card.style.opacity = '1';
+            card.style.transform = 'scale(1)';
+        });
+        
+        // Filter only the work section cards
+        elements.filterableCards.forEach(card => {
+            const category = card.getAttribute('data-category');
+            const subcategory = card.getAttribute('data-subcategory');
+            
+            let shouldShow = false;
+            
+            if (mainFilter === 'reels' && subFilter) {
+                shouldShow = category === 'reels' && subcategory === subFilter;
+            } else if (mainFilter === 'reels' && !subFilter) {
+                shouldShow = category === 'reels';
+            } else {
+                shouldShow = category === mainFilter;
+            }
+            
+            if (shouldShow) {
+                card.style.display = 'block';
+                requestAnimationFrame(() => {
+                    card.style.opacity = '1';
+                    card.style.transform = 'scale(1)';
+                });
+            } else {
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.8)';
+                setTimeout(() => {
+                    card.style.display = 'none';
+                }, 300);
+            }
+        });
+    });
+}
+
+// Enhanced function to ensure featured reels are always visible
+function ensureFeaturedReelsVisible() {
+    const featuredReelsSection = document.querySelector('.featured-reels, [class*="featured"]');
+    const featuredCards = document.querySelectorAll('.featured-reels .work-card, [class*="featured"] .work-card');
+    
+    if (featuredReelsSection) {
+        featuredReelsSection.style.display = 'block';
+        featuredReelsSection.style.opacity = '1';
     }
     
-    // Use event delegation for filters
-    document.addEventListener('click', function(e) {
-        const btn = e.target.closest('.filter-btn');
-        if (!btn) return;
+    featuredCards.forEach(card => {
+        card.style.display = 'block';
+        card.style.opacity = '1';
+        card.style.transform = 'scale(1)';
         
-        const elements = getFilterElements();
+        // Load media immediately for featured cards
+        const media = card.querySelector('img[data-src], video[data-src]');
+        if (media && media.dataset.src && !media.src) {
+            media.src = media.dataset.src;
+            if (media.tagName.toLowerCase() === 'video') {
+                media.load();
+            }
+        }
+    });
+}
+
+// Main filter click handler
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    
+    const elements = getFilterElements();
+    const filter = btn.getAttribute('data-filter');
+    
+    // Update active states
+    elements.buttons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    currentMainFilter = filter;
+    
+    // Show/hide reels subfilters
+    if (elements.reelsSubfilters || document.querySelector('.reels-filters')) {
+        const reelsFilters = elements.reelsSubfilters || document.querySelector('.reels-filters');
         
-        // Remove active class from all buttons
-        elements.buttons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+        if (filter === 'reels') {
+            reelsFilters.style.display = 'flex';
+            reelsFilters.classList.add('visible');
+            reelsFilters.classList.add('dealing');
+            
+            // If switching to reels, apply current sub filter
+            filterCards('reels', currentSubFilter);
+            loadMediaForFilter('reels', currentSubFilter);
+        } else {
+            reelsFilters.classList.remove('visible');
+            reelsFilters.classList.remove('dealing');
+            setTimeout(() => {
+                reelsFilters.style.display = 'none';
+            }, 300);
+            
+            // Filter for other categories
+            filterCards(filter);
+            loadMediaForFilter(filter);
+        }
+    } else {
+        // No subfilters container, just filter normally
+        filterCards(filter);
+        loadMediaForFilter(filter);
+    }
+    
+    // Always ensure featured reels remain visible
+    setTimeout(ensureFeaturedReelsVisible, 50);
+    
+}, { passive: true });
 
-        const filter = btn.getAttribute('data-filter');
+// Reels sub filter click handler
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.reels-filter-btn');
+    if (!btn) return;
+    
+    const elements = getFilterElements();
+    const subFilter = btn.getAttribute('data-reel-filter');
+    
+    // Update active states for sub filters
+    elements.reelsFilterBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    currentSubFilter = subFilter;
+    
+    // Filter cards and load media
+    filterCards('reels', subFilter);
+    loadMediaForFilter('reels', subFilter);
+    
+    // Always ensure featured reels remain visible
+    setTimeout(ensureFeaturedReelsVisible, 50);
+    
+}, { passive: true });
 
-        requestAnimationFrame(() => {
-            elements.cards.forEach(card => {
-                const category = card.getAttribute('data-category');
-                
-                if (filter === 'all' || category === filter) {
-                    card.style.display = 'block';
-                    requestAnimationFrame(() => {
-                        card.style.opacity = '1';
-                        card.style.transform = 'scale(1)';
-                    });
-                } else {
-                    card.style.opacity = '0';
-                    card.style.transform = 'scale(0.8)';
-                    setTimeout(() => {
-                        card.style.display = 'none';
-                    }, 300);
-                }
-            });
-        });
-    }, { passive: true });
+// Initialize default state
+function initializeWorkFilters() {
+    // Create reels filters container to match your CSS class name
+    let reelsFilters = document.querySelector('.reels-filters');
+    
+    if (!reelsFilters) {
+        reelsFilters = document.createElement('div');
+        reelsFilters.className = 'reels-filters visible dealing';
+        reelsFilters.innerHTML = `
+            <button class="reels-filter-btn active" data-reel-filter="yayfest">YayFest</button>
+            <button class="reels-filter-btn" data-reel-filter="azer">Azər Aydəmir</button>
+            <button class="reels-filter-btn" data-reel-filter="idea">İDEA</button>
+            <button class="reels-filter-btn" data-reel-filter="others">Others</button>
+        `;
+        
+        // Insert after main filter buttons or before works grid
+        const worksFilters = document.querySelector('.works-filters') || 
+                            document.querySelector('.filter-buttons') ||
+                            document.querySelector('[class*="filter"]');
+        
+        if (worksFilters) {
+            worksFilters.insertAdjacentElement('afterend', reelsFilters);
+        } else {
+            const worksGrid = document.querySelector('.works-grid') || 
+                            document.querySelector('.work-cards') ||
+                            document.querySelector('[class*="work"]');
+            if (worksGrid) {
+                worksGrid.insertAdjacentElement('beforebegin', reelsFilters);
+            } else {
+                // Add to body as fallback
+                document.body.appendChild(reelsFilters);
+            }
+        }
+        
+        console.log('✅ Reels filters container created with your CSS classes');
+    }
+    
+    requestAnimationFrame(() => {
+        // Force show filters with your CSS classes
+        reelsFilters.style.display = 'flex';
+        reelsFilters.classList.add('visible');
+        reelsFilters.classList.add('dealing');
+        
+        // Set default main filter active
+        const defaultMainBtn = document.querySelector('.filter-btn[data-filter="reels"]');
+        if (defaultMainBtn) {
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            defaultMainBtn.classList.add('active');
+        }
+        
+        // Set default sub filter active
+        const defaultSubBtn = reelsFilters.querySelector('.reels-filter-btn[data-reel-filter="yayfest"]');
+        if (defaultSubBtn) {
+            reelsFilters.querySelectorAll('.reels-filter-btn').forEach(btn => btn.classList.remove('active'));
+            defaultSubBtn.classList.add('active');
+        }
+        
+        // Update filter elements cache
+        filterElements = null;
+        
+        // Filter cards and load only yayfest media initially
+        filterCards('reels', 'yayfest');
+        loadMediaForFilter('reels', 'yayfest');
+        
+        // Ensure featured reels are always visible
+        ensureFeaturedReelsVisible();
+        
+        console.log('✅ Work filters initialized with featured reels always visible');
+        console.log('🔍 Filters container:', reelsFilters);
+        console.log('🔍 Filter buttons:', reelsFilters.querySelectorAll('.reels-filter-btn').length);
+    });
+}
 
-    // ===============================
-    // 12. PARALLAX - OPTIMIZED WITH RAF
-    // ===============================
-    let parallaxFrame = null;
-    const heroVideo = document.querySelector('.hero-video');
+// Initialize multiple times to ensure it works
+setTimeout(initializeWorkFilters, 100);
+setTimeout(initializeWorkFilters, 500);
+setTimeout(initializeWorkFilters, 1000);
+
+// Additional safety check to keep featured reels visible
+setInterval(() => {
+    ensureFeaturedReelsVisible();
+}, 2000);
+
+// ===============================
+// 12. PARALLAX - OPTIMIZED WITH RAF
+// ===============================
+let parallaxFrame = null;
+const heroVideo = document.querySelector('.hero-video');
     
     function handleParallax() {
         if (parallaxFrame) return;

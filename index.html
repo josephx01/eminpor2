@@ -1400,7 +1400,7 @@
     <!-- Hero Section -->
     <section id="home" class="hero">
         <video class="hero-video" autoplay muted loop playsinline>
-            <source src="" type="video/mp4">
+            <source src="https://pub-85bfca0674ab4b4b9679847e5eee499c.r2.dev/Emin.mp4" type="video/mp4">
         </video>
         <div class="hero-overlay"></div>
         <div class="grain-overlay"></div>
@@ -1664,23 +1664,6 @@
     <iframe width="560" height="315" src="https://www.youtube.com/embed/cGC4eqMTSa0?si=c2uQg6QCVvAyQAj4" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </div>
     </section>
-    <!-- About Section -->
-    <section id="about" class="section">
-        <h2 class="section-title">About</h2>
-        <div class="about-content">
-            <div class="about-text">
-                <h3>The Journey of Visual Poetry</h3>
-                <p>My name is Emin Niyazlı, and I believe every story deserves to be told with the power it holds within. For over a decade, I've been capturing the essence of human emotion through the lens of cinematic storytelling.</p>
-                
-                <p>What started as a passion project in the bustling streets of Baku has evolved into a lifelong commitment to creating visual narratives that resonate deeply with audiences worldwide. Each frame I craft is a deliberate choice, each cut a heartbeat in the larger rhythm of the story.</p>
-                
-                <p>My work spans across commercials, fashion films, documentaries, and music videos – but regardless of the medium, my goal remains the same: to create moments that linger in the viewer's mind long after the screen goes dark.</p>
-                
-                <p>I draw inspiration from the golden hour's warm embrace, the raw authenticity of street photography, and the subtle emotions that dance across human faces. Every project is an opportunity to push creative boundaries and explore new ways of connecting with audiences on an emotional level.</p>
-            </div>
-        </div>
-    </section>
-
         <section id="contact" class="section">
         <h2 class="section-title">Contact</h2>
         <div class="contact-content">
@@ -4627,6 +4610,158 @@ window.testOpenModal = function(index = 0) {
 
 console.log('🎯 Video düzəliş yükləndi!');
 console.log('🧪 Test funksiyaları: testVideoCardClick(), testOpenModal(index)');
+// ===============================
+// ===============================
+// iOS VIDEO THUMBNAIL FIX - MINIMAL VERSION
+// Yalnız iOS-da video thumbnail problemi həll edir
+// Mövcud dizayna toxunmur!
+// ===============================
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🍎 iOS video thumbnail fix - minimal version');
+    
+    // iOS müəyyənləşdirmə
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    
+    console.log(`iOS cihaz: ${isIOS ? 'BƏLİ' : 'XEYR'}`);
+    
+    // Yalnız iOS-da işləsin
+    if (!isIOS) {
+        console.log('❌ iOS deyil - script dayandırılır');
+        return;
+    }
+    
+    // ===============================
+    // YALNIZ POSTER OLMAYAN VIDEOLAR ÜÇÜN FIX
+    // ===============================
+    
+    function fixIOSVideoThumbnails() {
+        const videos = document.querySelectorAll('video');
+        let fixedCount = 0;
+        
+        videos.forEach((video, index) => {
+            // Artıq fix edilib?
+            if (video.dataset.iosThumbnailFixed === 'true') return;
+            
+            // Poster var?
+            const hasPoster = video.poster && video.poster.trim() !== '';
+            
+            if (hasPoster) {
+                console.log(`✅ Video ${index} - poster var, keçilir`);
+                return;
+            }
+            
+            console.log(`🔧 Video ${index} - poster yox, düzəldilir...`);
+            
+            // iOS üçün video atributları
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.preload = 'metadata';
+            
+            // Thumbnail yaratmağa çalış
+            createIOSThumbnail(video, index);
+            
+            video.dataset.iosThumbnailFixed = 'true';
+            fixedCount++;
+        });
+        
+        console.log(`✅ ${fixedCount} video iOS üçün düzəldildi`);
+    }
+    
+    // ===============================
+    // IOS ÜÇÜN THUMBNAIL YARATMA
+    // ===============================
+    
+    function createIOSThumbnail(video, index) {
+        // Video metadata yüklənəndə
+        const handleLoadedData = function() {
+            try {
+                // Canvas yarad
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Video ölçüləri
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 360;
+                
+                // İlk frame çək (0.1 saniyə)
+                video.currentTime = 0.1;
+                
+                video.addEventListener('seeked', function() {
+                    try {
+                        // Frame-i canvas-a çək
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        
+                        // Data URL yarad
+                        const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        
+                        // Video-ya poster kimi təyin et
+                        video.poster = thumbnailUrl;
+                        
+                        console.log(`📸 Video ${index} üçün iOS thumbnail yaradıldı`);
+                        
+                    } catch (error) {
+                        console.warn(`⚠️ Video ${index} thumbnail xətası:`, error.message);
+                        
+                        // CORS xətası - sadə poster təyin et
+                        if (error.name === 'SecurityError') {
+                            video.poster = createSimplePoster(index);
+                        }
+                    }
+                }, { once: true });
+                
+            } catch (error) {
+                console.warn(`⚠️ Video ${index} canvas xətası:`, error.message);
+                video.poster = createSimplePoster(index);
+            }
+            
+            video.removeEventListener('loadeddata', handleLoadedData);
+        };
+        
+        // Video hazır olub?
+        if (video.readyState >= 1) {
+            handleLoadedData();
+        } else {
+            video.addEventListener('loadeddata', handleLoadedData, { once: true });
+            
+            // 3 saniyə timeout
+            setTimeout(() => {
+                video.removeEventListener('loadeddata', handleLoadedData);
+                console.warn(`⚠️ Video ${index} metadata timeout`);
+                video.poster = createSimplePoster(index);
+            }, 3000);
+        }
+    }
+    
+    // ===============================
+    // SADƏ POSTER YARATMA (CORS PROBLEMI ÜÇÜN)
+    // ===============================
+    
+    function createSimplePoster(index) {
+        // 1x1 şəffaf PNG (minimal impact)
+        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+    }
+    
+    // ===============================
+    // İNİTİALİZASİYA
+    // ===============================
+    
+    console.log('🚀 iOS video thumbnail fix başlayır...');
+    
+    // Dərhal çalışdır
+    fixIOSVideoThumbnails();
+    
+    // 1 saniyə sonra yenidən (DOM tam yüklənəndə)
+    setTimeout(fixIOSVideoThumbnails, 1000);
+    
+    // Global funksiya
+    window.fixIOSVideos = fixIOSVideoThumbnails;
+    
+    console.log('✅ iOS video thumbnail fix hazırdır');
+});
+
+console.log('🍎 iOS Video Thumbnail Fix (Minimal) yükləndi');
 }
     </script>
 </body>

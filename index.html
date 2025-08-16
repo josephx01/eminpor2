@@ -5343,6 +5343,518 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 console.log('🍎 iOS Video Thumbnail Fix (Minimal) yükləndi');
+// HTML-dəki video strukturunu düzəltmək üçün kod
+document.addEventListener('DOMContentLoaded', function() {
+    
+    console.log('🔧 Fixing video structure for iOS compatibility...');
+    
+    // ===============================
+    // VIDEO STRUCTURE FİX
+    // ===============================
+    
+    function fixVideoStructure() {
+        const workCards = document.querySelectorAll('.work-card');
+        let fixedVideos = 0;
+        
+        workCards.forEach((card, index) => {
+            const video = card.querySelector('video, .work-video');
+            
+            if (video) {
+                fixVideoElement(video, card, index);
+                fixedVideos++;
+            }
+        });
+        
+        console.log(`✅ Fixed ${fixedVideos} videos for iOS compatibility`);
+    }
+    
+    function fixVideoElement(video, card, index) {
+        // 1. Video atributlarını düzəlt
+        video.setAttribute('playsinline', '');
+        video.setAttribute('webkit-playsinline', '');
+        video.setAttribute('muted', '');
+        video.muted = true;
+        video.preload = 'metadata';
+        video.controls = false;
+        
+        // 2. Class əlavə et
+        if (!video.classList.contains('work-video')) {
+            video.classList.add('work-video');
+        }
+        
+        // 3. Source elementlərini yoxla və düzəlt
+        fixVideoSources(video);
+        
+        // 4. Poster əlavə et (opsional)
+        if (!video.poster && !video.getAttribute('poster')) {
+            video.poster = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiMxYTFhMWEiLz48L3N2Zz4=';
+        }
+        
+        // 5. Container pozisiyasını düzəlt
+        if (card && getComputedStyle(card).position === 'static') {
+            card.style.position = 'relative';
+        }
+        
+        console.log(`🔧 Fixed video ${index + 1}`);
+    }
+    
+    function fixVideoSources(video) {
+        const sources = video.querySelectorAll('source');
+        let hasValidSource = false;
+        
+        sources.forEach(source => {
+            const src = source.getAttribute('src');
+            
+            if (src) {
+                // Type atributu əlavə et/düzəlt
+                if (src.includes('.mp4')) {
+                    source.setAttribute('type', 'video/mp4');
+                    hasValidSource = true;
+                } else if (src.includes('.mov')) {
+                    // MOV faylları iOS-da daha yaxşı işləyir
+                    source.setAttribute('type', 'video/quicktime');
+                    hasValidSource = true;
+                } else if (src.includes('.webm')) {
+                    source.setAttribute('type', 'video/webm');
+                    hasValidSource = true;
+                }
+                
+                // Codecs atributunu sil (iOS-da problem yaradır)
+                if (source.hasAttribute('codecs')) {
+                    source.removeAttribute('codecs');
+                }
+            }
+        });
+        
+        // Əgər video src-i varsa source yarad
+        if (video.src && !hasValidSource) {
+            const source = document.createElement('source');
+            source.src = video.src;
+            
+            if (video.src.includes('.mp4')) {
+                source.type = 'video/mp4';
+            } else if (video.src.includes('.mov')) {
+                source.type = 'video/quicktime';
+            } else if (video.src.includes('.webm')) {
+                source.type = 'video/webm';
+            }
+            
+            video.appendChild(source);
+            hasValidSource = true;
+        }
+        
+        // Video-nu yenidən yüklə
+        if (hasValidSource) {
+            video.load();
+        }
+    }
+    
+    // ===============================
+    // MODAL VIDEO FİX
+    // ===============================
+    
+    function fixModalVideo() {
+        const modalVideo = document.querySelector('#modalVideo');
+        
+        if (modalVideo) {
+            modalVideo.setAttribute('playsinline', '');
+            modalVideo.setAttribute('webkit-playsinline', '');
+            modalVideo.muted = false; // Modal videolar səsli ola bilər
+            modalVideo.controls = true;
+            modalVideo.preload = 'metadata';
+            
+            console.log('🔧 Fixed modal video for iOS');
+        }
+    }
+    
+    // ===============================
+    // HERO VIDEO FİX
+    // ===============================
+    
+    function fixHeroVideo() {
+        const heroVideo = document.querySelector('.hero-video');
+        
+        if (heroVideo) {
+            heroVideo.setAttribute('playsinline', '');
+            heroVideo.setAttribute('webkit-playsinline', '');
+            heroVideo.muted = true;
+            heroVideo.autoplay = true;
+            heroVideo.loop = true;
+            heroVideo.preload = 'auto';
+            
+            // Autoplay üçün istifadəçi interaksiyasını gözlə
+            const enableHeroAutoplay = () => {
+                heroVideo.play().catch(e => {
+                    console.log('Hero video autoplay failed:', e);
+                });
+            };
+            
+            document.addEventListener('touchstart', enableHeroAutoplay, { once: true });
+            document.addEventListener('click', enableHeroAutoplay, { once: true });
+            
+            console.log('🔧 Fixed hero video for iOS');
+        }
+    }
+    
+    // ===============================
+    // REELS VIDEO FİX
+    // ===============================
+    
+    function fixReelsVideos() {
+        const reelsVideos = document.querySelectorAll('.reels-container video, .reel-video');
+        
+        reelsVideos.forEach((video, index) => {
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.muted = true;
+            video.preload = 'metadata';
+            video.controls = false;
+            
+            fixVideoSources(video);
+            
+            console.log(`🔧 Fixed reel video ${index + 1}`);
+        });
+    }
+    
+    // ===============================
+    // HOVER EFFECTS VƏ PLAY/PAUSE
+    // ===============================
+    
+    function setupVideoInteractions() {
+        const videos = document.querySelectorAll('.work-video, .reel-video');
+        
+        videos.forEach((video, index) => {
+            // Hover/Touch play/pause
+            let hoverTimeout;
+            
+            const playVideo = () => {
+                if (video.paused) {
+                    video.play().catch(e => {
+                        console.log(`Video ${index + 1} play failed:`, e);
+                    });
+                }
+            };
+            
+            const pauseVideo = () => {
+                if (!video.paused) {
+                    video.pause();
+                }
+            };
+            
+            // Desktop hover events
+            video.addEventListener('mouseenter', () => {
+                clearTimeout(hoverTimeout);
+                hoverTimeout = setTimeout(playVideo, 200);
+            });
+            
+            video.addEventListener('mouseleave', () => {
+                clearTimeout(hoverTimeout);
+                pauseVideo();
+            });
+            
+            // Mobile touch events
+            video.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                playVideo();
+            });
+            
+            video.addEventListener('touchend', () => {
+                setTimeout(pauseVideo, 3000); // 3 saniyə sonra pause
+            });
+            
+            // Click events for modal
+            video.addEventListener('click', (e) => {
+                e.preventDefault();
+                openVideoModal(video);
+            });
+        });
+        
+        console.log(`✅ Setup interactions for ${videos.length} videos`);
+    }
+    
+    // ===============================
+    // VIDEO MODAL SİSTEMİ
+    // ===============================
+    
+    function setupVideoModal() {
+        // Modal HTML yaratmaq
+        if (!document.querySelector('#videoModal')) {
+            const modalHTML = `
+                <div id="videoModal" class="video-modal" style="
+                    display: none;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.9);
+                    z-index: 9999;
+                    padding: 20px;
+                    box-sizing: border-box;
+                ">
+                    <div class="modal-content" style="
+                        position: relative;
+                        width: 100%;
+                        height: 100%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    ">
+                        <video id="modalVideo" style="
+                            max-width: 100%;
+                            max-height: 100%;
+                            width: auto;
+                            height: auto;
+                        " controls playsinline webkit-playsinline></video>
+                        <button id="closeModal" style="
+                            position: absolute;
+                            top: 10px;
+                            right: 10px;
+                            background: rgba(255, 255, 255, 0.2);
+                            border: none;
+                            color: white;
+                            font-size: 24px;
+                            padding: 10px;
+                            cursor: pointer;
+                            border-radius: 50%;
+                            width: 50px;
+                            height: 50px;
+                        ">×</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+        
+        // Modal event listeners
+        const modal = document.querySelector('#videoModal');
+        const modalVideo = document.querySelector('#modalVideo');
+        const closeBtn = document.querySelector('#closeModal');
+        
+        closeBtn.addEventListener('click', closeVideoModal);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeVideoModal();
+            }
+        });
+        
+        // ESC key ilə modal bağla
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                closeVideoModal();
+            }
+        });
+        
+        console.log('✅ Video modal system setup complete');
+    }
+    
+    function openVideoModal(video) {
+        const modal = document.querySelector('#videoModal');
+        const modalVideo = document.querySelector('#modalVideo');
+        
+        if (modal && modalVideo) {
+            // Video source-u kopyala
+            modalVideo.src = video.src || video.querySelector('source')?.src || '';
+            
+            // Video atributlarını təyin et
+            modalVideo.muted = false;
+            modalVideo.controls = true;
+            modalVideo.setAttribute('playsinline', '');
+            modalVideo.setAttribute('webkit-playsinline', '');
+            
+            // Modal-ı göstər
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            
+            // Video-nu yüklə və oyna
+            modalVideo.load();
+            modalVideo.play().catch(e => {
+                console.log('Modal video play failed:', e);
+            });
+        }
+    }
+    
+    function closeVideoModal() {
+        const modal = document.querySelector('#videoModal');
+        const modalVideo = document.querySelector('#modalVideo');
+        
+        if (modal && modalVideo) {
+            modalVideo.pause();
+            modalVideo.src = '';
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    }
+    
+    // ===============================
+    // LAZY LOADING SİSTEMİ
+    // ===============================
+    
+    function setupLazyLoading() {
+        const videos = document.querySelectorAll('video[data-src]');
+        
+        const videoObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const video = entry.target;
+                    const src = video.getAttribute('data-src');
+                    
+                    if (src) {
+                        video.src = src;
+                        video.removeAttribute('data-src');
+                        video.load();
+                        
+                        // Video düzəlişlərini tətbiq et
+                        fixVideoElement(video, video.closest('.work-card'));
+                    }
+                    
+                    videoObserver.unobserve(video);
+                }
+            });
+        }, {
+            rootMargin: '50px'
+        });
+        
+        videos.forEach(video => {
+            videoObserver.observe(video);
+        });
+        
+        console.log(`✅ Setup lazy loading for ${videos.length} videos`);
+    }
+    
+    // ===============================
+    // PERFORMANCE MONİTORİNG
+    // ===============================
+    
+    function monitorVideoPerformance() {
+        const videos = document.querySelectorAll('video');
+        let loadErrors = 0;
+        let playErrors = 0;
+        
+        videos.forEach((video, index) => {
+            video.addEventListener('error', (e) => {
+                loadErrors++;
+                console.error(`Video ${index + 1} load error:`, e);
+            });
+            
+            video.addEventListener('loadstart', () => {
+                console.log(`Video ${index + 1} started loading`);
+            });
+            
+            video.addEventListener('canplay', () => {
+                console.log(`Video ${index + 1} can play`);
+            });
+            
+            video.addEventListener('stalled', () => {
+                console.warn(`Video ${index + 1} stalled`);
+            });
+        });
+        
+        // Performance məlumatlarını göstər
+        setTimeout(() => {
+            console.log(`📊 Video Performance Report:
+                Total Videos: ${videos.length}
+                Load Errors: ${loadErrors}
+                Play Errors: ${playErrors}
+            `);
+        }, 5000);
+    }
+    
+    // ===============================
+    // SİSTEMİ İŞƏ SAL
+    // ===============================
+    
+    // Təcili düzəlişlər
+    fixVideoStructure();
+    fixModalVideo();
+    fixHeroVideo();
+    fixReelsVideos();
+    
+    // Video modal sistemi qur
+    setupVideoModal();
+    
+    // Video interaksiyalarını qur
+    setupVideoInteractions();
+    
+    // Lazy loading sistemi
+    setupLazyLoading();
+    
+    // Performance monitoring
+    monitorVideoPerformance();
+    
+    // Gecikmə ilə yenidən yoxla
+    setTimeout(() => {
+        fixVideoStructure();
+        console.log('🔄 Re-checked video structure');
+    }, 1000);
+    
+    // Resize eventində yenidən düzəlt
+    window.addEventListener('resize', () => {
+        setTimeout(() => {
+            fixVideoStructure();
+            console.log('🔄 Re-fixed videos after resize');
+        }, 500);
+    });
+    
+    // Orientation dəyişikliyində yenidən düzəlt
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+            fixVideoStructure();
+            setupVideoInteractions();
+            console.log('🔄 Re-fixed videos after orientation change');
+        }, 1000);
+    });
+    
+    // Network dəyişikliklərini izlə (opsional)
+    if ('connection' in navigator) {
+        navigator.connection.addEventListener('change', () => {
+            console.log('📶 Network changed, adjusting video quality...');
+            
+            const videos = document.querySelectorAll('video');
+            videos.forEach(video => {
+                if (navigator.connection.effectiveType === 'slow-2g' || 
+                    navigator.connection.effectiveType === '2g') {
+                    video.preload = 'none';
+                } else {
+                    video.preload = 'metadata';
+                }
+            });
+        });
+    }
+    
+    console.log('✅ iOS Video Fix System fully initialized!');
+    
+}); // DOMContentLoaded sonu
+
+// ===============================
+// GLOBAL HELPER FUNKSİYALAR
+// ===============================
+
+// Video-nu əl ilə düzəltmək üçün
+window.fixVideo = function(videoElement) {
+    if (videoElement && videoElement.tagName === 'VIDEO') {
+        fixVideoElement(videoElement, videoElement.closest('.work-card'));
+        console.log('✅ Manually fixed video');
+    }
+};
+
+// Bütün video-ları yenidən düzəltmək üçün
+window.refreshAllVideos = function() {
+    document.dispatchEvent(new Event('DOMContentLoaded'));
+    console.log('🔄 Refreshed all videos');
+};
+
+// Video modal-ını əl ilə açmaq üçün
+window.openVideoInModal = function(videoSrc) {
+    const modalVideo = document.querySelector('#modalVideo');
+    if (modalVideo) {
+        modalVideo.src = videoSrc;
+        document.querySelector('#videoModal').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        modalVideo.play();
+    }
+};
 }
     </script>
 </body>

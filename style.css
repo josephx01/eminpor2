@@ -762,6 +762,81 @@
     border-radius: 10px;
     /* object-fit: cover silindi */
 }
+/* iOS Play Button Container */
+.ios-play-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* iOS Play Button */
+.ios-play-btn {
+    background: rgba(255, 165, 0, 0.95);
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 18px;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 8px 32px rgba(255, 165, 0, 0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.ios-play-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 12px 40px rgba(255, 165, 0, 0.6);
+}
+
+.ios-play-btn:active {
+    transform: scale(0.95);
+}
+
+/* Video Fallback */
+.video-fallback {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-family: 'Montserrat', sans-serif;
+    text-align: center;
+    z-index: 5;
+    border-radius: 12px;
+}
+
+.video-fallback div {
+    padding: 20px;
+}
+
+.video-fallback div:first-child {
+    font-size: 3rem;
+    margin-bottom: 15px;
+    opacity: 0.7;
+}
+
+.video-fallback div:last-child {
+    font-size: 1.1rem;
+    opacity: 0.8;
+    font-weight: 500;
+}
 .work-card {
     position: relative;
     overflow: hidden;
@@ -807,7 +882,12 @@
         padding: 20px;
         gap: 15px;
     }
-    
+        .ios-play-btn {
+        width: 50px;
+        height: 50px;
+        font-size: 16px;
+    }
+
     .work-card {
         height: 250px;
     }
@@ -829,8 +909,19 @@
         width: 100%;
         height: 200px;
     }
+        .ios-play-container {
+        opacity: 1 !important;
+    }
 }
 
+/* Loading state */
+.work-card.loading .work-video {
+    opacity: 0.5;
+}
+
+.work-card.loading .ios-play-btn {
+    animation: pulse 1.5s infinite;
+}
 @media (min-width: 769px) and (max-width: 1024px) {
     .works-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -839,6 +930,92 @@
 
     .work-card {
         height: 280px;
+    }
+}
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+}
+
+/* Error state */
+.work-card.error .ios-play-btn {
+    background: #ff4444;
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+/* Video hover effects - yalnız desktop */
+@media (min-width: 769px) {
+    .work-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        border: 2px solid #ffa500;
+    }
+    
+    .work-card:hover .ios-play-container {
+        opacity: 1;
+    }
+}
+
+/* Safari specific fixes */
+@supports (-webkit-backdrop-filter: none) {
+    .ios-play-btn {
+        -webkit-backdrop-filter: blur(10px);
+    }
+}
+
+/* High DPI ekranlar üçün */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .work-video, .work-card video {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .work-card {
+        /* Touch üçün daha böyük hit area */
+        padding: 10px;
+        box-sizing: border-box;
+    }
+    
+    .ios-play-container {
+        opacity: 0.8;
+        pointer-events: auto;
+    }
+    
+    .ios-play-btn {
+        /* Touch üçün daha böyük */
+        width: 70px;
+        height: 70px;
+        font-size: 20px;
+    }
+    
+    .work-overlay {
+        /* Mobile-də overlay həmişə görsənsin */
+        transform: translateY(0);
+        opacity: 0.9;
+        background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 100%);
+        padding: 15px;
+        border-radius: 0 0 12px 12px;
+    }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .work-card, .ios-play-btn, .work-overlay {
+        transition: none;
+    }
+    
+    .ios-play-btn {
+        animation: none;
     }
 }
     

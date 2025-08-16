@@ -4187,437 +4187,446 @@ window.addEventListener('load', () => {
 
     console.log('✅ Forced Reels section & filters to always be visible');
 });
-// iOS Video problemini həll edən təkmilləşdirilmiş kod
+// ===============================
+// VİDEO KART CLICK PROBLEMİNİN DÜZƏLİŞİ
+// ===============================
+
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // iOS və Safari aşkarlanması
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    const isMobile = window.innerWidth <= 768;
-    
-    console.log(`📱 Device Detection: iOS=${isIOS}, Safari=${isSafari}, Mobile=${isMobile}`);
+    console.log('🔧 Video kart click düzəlişi başlayır...');
     
     // ===============================
-    // iOS VIDEO HƏLL SİSTEMİ
+    // PROBLEMİN SƏBƏBİ: 
+    // - Modal video array düzgün qurulmayıb
+    // - Index hesablaması səhv işləyir
+    // - Click handler-lər qarışıq işləyir
     // ===============================
     
-    class iOSVideoManager {
-        constructor() {
-            this.videoCards = [];
-            this.userInteracted = false;
-            this.init();
-        }
+    // Modal sistemini yenidən quraq
+    let modalVideoCards = [];
+    let currentModalIndex = 0;
+    
+    function rebuildModalSystem() {
+        console.log('🏗️ Modal sistem yenidən qurulur...');
         
-        init() {
-            this.setupUserInteraction();
-            this.processAllVideos();
-            this.setupIntersectionObserver();
-        }
+        // Bütün video kartları topla (görünən və gizli hər ikisi)
+        modalVideoCards = Array.from(document.querySelectorAll('.work-card')).filter(card => {
+            return card.querySelector('video, .work-video');
+        });
         
-        setupUserInteraction() {
-            // İstifadəçi ilk toxunuşu - vacib iOS üçün
-            const enableInteraction = () => {
-                this.userInteracted = true;
-                console.log('✅ User interaction registered');
-                
-                // Bütün videoları hazırla
-                this.videoCards.forEach(card => {
-                    if (card.video && !card.activated) {
-                        this.prepareVideo(card);
-                    }
-                });
-            };
-            
-            document.addEventListener('touchstart', enableInteraction, { once: true, passive: true });
-            document.addEventListener('click', enableInteraction, { once: true, passive: true });
-        }
+        console.log(`📊 Tapılan video kartları: ${modalVideoCards.length}`);
         
-        processAllVideos() {
-            const workCards = document.querySelectorAll('.work-card');
+        // Hər karta düzgün click handler əlavə et
+        modalVideoCards.forEach((card, actualIndex) => {
+            // Köhnə listener-ləri sil
+            card.replaceWith(card.cloneNode(true));
+            const newCard = modalVideoCards[actualIndex] = document.querySelectorAll('.work-card')[actualIndex];
             
-            workCards.forEach((card, index) => {
-                const video = card.querySelector('.work-video, video');
-                if (video) {
-                    this.createVideoCard(card, video, index);
-                }
-            });
-        }
-        
-        createVideoCard(card, video, index) {
-            const cardData = {
-                card: card,
-                video: video,
-                overlay: card.querySelector('.work-overlay'),
-                index: index,
-                activated: false,
-                playing: false
-            };
-            
-            // iOS üçün xüsusi ayarlar
-            if (isIOS) {
-                this.setupiOSVideo(cardData);
-            } else {
-                this.setupNormalVideo(cardData);
-            }
-            
-            this.videoCards.push(cardData);
-        }
-        
-        setupiOSVideo(cardData) {
-            const { video, card } = cardData;
-            
-            // iOS üçün məcburi atributlar
-            video.muted = true;
-            video.playsInline = true;
-            video.setAttribute('playsinline', '');
-            video.setAttribute('webkit-playsinline', '');
-            video.preload = 'metadata';
-            video.controls = false;
-            
-            // Video source-ları təmizlə və təkrar əlavə et
-            this.fixVideoSources(video);
-            
-            // Play button əlavə et
-            this.addPlayButton(cardData);
-            
-            // Event handler-lər
-            this.setupVideoEvents(cardData);
-        }
-        
-        setupNormalVideo(cardData) {
-            const { video } = cardData;
-            
-            video.muted = true;
-            video.playsInline = true;
-            video.preload = 'metadata';
-            
-            this.setupVideoEvents(cardData);
-        }
-        
-        fixVideoSources(video) {
-            // Mövcud source-ları götür
-            const sources = Array.from(video.querySelectorAll('source'));
-            const videoSrc = video.src;
-            
-            // Video-nu təmizlə
-            video.innerHTML = '';
-            video.removeAttribute('src');
-            
-            // MP4 source əlavə et (iOS üçün ən yaxşı)
-            if (videoSrc) {
-                const source = document.createElement('source');
-                source.src = videoSrc;
-                source.type = 'video/mp4';
-                video.appendChild(source);
-            }
-            
-            // Digər source-ları əlavə et
-            sources.forEach(source => {
-                if (source.src && source.src.includes('.mp4')) {
-                    const newSource = document.createElement('source');
-                    newSource.src = source.src;
-                    newSource.type = 'video/mp4';
-                    video.appendChild(newSource);
-                }
-            });
-            
-            // Video-nu yenidən yüklə
-            video.load();
-        }
-        
-        addPlayButton(cardData) {
-            const { card, video } = cardData;
-            
-            // Play button container
-            const playContainer = document.createElement('div');
-            playContainer.className = 'ios-play-container';
-            playContainer.style.cssText = `
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                z-index: 10;
-                pointer-events: none;
-                opacity: 0;
-                transition: opacity 0.3s ease;
-            `;
-            
-            // Play button
-            const playBtn = document.createElement('button');
-            playBtn.className = 'ios-play-btn';
-            playBtn.innerHTML = '▶';
-            playBtn.style.cssText = `
-                background: rgba(255, 165, 0, 0.9);
-                border: none;
-                border-radius: 50%;
-                width: 60px;
-                height: 60px;
-                font-size: 20px;
-                color: white;
-                cursor: pointer;
-                pointer-events: auto;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            `;
-            
-            playBtn.addEventListener('click', (e) => {
+            // Yeni düzgün click handler
+            newCard.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                this.playVideo(cardData);
+                
+                console.log(`🎬 Kart ${actualIndex} tıklandı (0-based index)`);
+                
+                // Index-i yadda saxla
+                currentModalIndex = actualIndex;
+                
+                // Modal aç
+                openVideoModalFixed(actualIndex);
             });
             
-            playContainer.appendChild(playBtn);
-            card.style.position = 'relative';
-            card.appendChild(playContainer);
-            
-            cardData.playContainer = playContainer;
-            cardData.playBtn = playBtn;
+            console.log(`✅ Kart ${actualIndex} click handler-i yeniləndi`);
+        });
+    }
+    
+    // ===============================
+    // DÜZELDİLMİŞ MODAL AÇMA FUNKSİYASI
+    // ===============================
+    
+    function openVideoModalFixed(cardIndex) {
+        console.log(`🎥 Modal açılır: kart index ${cardIndex}`);
+        
+        if (cardIndex < 0 || cardIndex >= modalVideoCards.length) {
+            console.error(`❌ Səhv card index: ${cardIndex} (Maksimum: ${modalVideoCards.length - 1})`);
+            return;
         }
         
-        setupVideoEvents(cardData) {
-            const { video, card, playContainer } = cardData;
-            
-            // Mouse events (desktop)
-            if (!isMobile) {
-                card.addEventListener('mouseenter', () => {
-                    if (isIOS && !cardData.activated) {
-                        if (playContainer) playContainer.style.opacity = '1';
-                    } else {
-                        this.playVideo(cardData);
-                    }
+        const card = modalVideoCards[cardIndex];
+        if (!card) {
+            console.error(`❌ Kart tapılmadı: index ${cardIndex}`);
+            return;
+        }
+        
+        const video = card.querySelector('video, .work-video');
+        if (!video) {
+            console.error(`❌ Video tapılmadı: kart ${cardIndex}`);
+            return;
+        }
+        
+        // Modal elementlərini tap
+        const modal = document.getElementById('videoModal') || 
+                     document.querySelector('.video-modal');
+        const modalVideo = document.getElementById('modalVideo') || 
+                          modal?.querySelector('video');
+        
+        if (!modal || !modalVideo) {
+            console.error('❌ Modal elementləri tapılmadı');
+            return;
+        }
+        
+        // Video source-unu düzgün əldə et
+        let videoSrc = getVideoSource(video);
+        
+        if (!videoSrc) {
+            console.error(`❌ Video source tapılmadı: kart ${cardIndex}`);
+            console.log('Debug video:', {
+                src: video.src,
+                dataSrc: video.dataset.src,
+                sources: video.querySelectorAll('source').length
+            });
+            return;
+        }
+        
+        console.log(`✅ Video source: ${videoSrc}`);
+        
+        // Modal video-nu hazırla
+        modalVideo.src = videoSrc;
+        modalVideo.muted = false;
+        modalVideo.currentTime = 0;
+        modalVideo.controls = true;
+        modalVideo.load();
+        
+        // Modal məlumatları
+        const overlay = card.querySelector('.work-overlay');
+        const title = overlay?.querySelector('h3')?.textContent || 
+                     card.getAttribute('data-title') || 
+                     `Video ${cardIndex + 1}`;
+        const description = overlay?.querySelector('p')?.textContent || 
+                           card.getAttribute('data-description') || '';
+        
+        // Modal mətnləri yenilə
+        const modalTitle = document.getElementById('videoTitle') || 
+                          modal.querySelector('h3, .video-title');
+        const modalDesc = document.getElementById('videoDescription') || 
+                         modal.querySelector('p, .video-description');
+        
+        if (modalTitle) modalTitle.textContent = title;
+        if (modalDesc) modalDesc.textContent = description;
+        
+        // Counter yenilə
+        updateModalCounterFixed(cardIndex);
+        
+        // Navigation göstər/gizlə
+        const prevBtn = modal.querySelector('.video-modal-prev, .lightbox-prev');
+        const nextBtn = modal.querySelector('.video-modal-next, .lightbox-next');
+        
+        const showNav = modalVideoCards.length > 1;
+        if (prevBtn) prevBtn.style.display = showNav ? 'flex' : 'none';
+        if (nextBtn) nextBtn.style.display = showNav ? 'flex' : 'none';
+        
+        // Modal göstər
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        
+        console.log(`✅ Modal açıldı: ${title}`);
+        
+        // Video oynadan
+        setTimeout(() => {
+            const playPromise = modalVideo.play();
+            if (playPromise) {
+                playPromise.catch(e => {
+                    console.log('Video oynatma üçün user interaction lazım:', e.message);
                 });
-                
-                card.addEventListener('mouseleave', () => {
-                    if (playContainer) playContainer.style.opacity = '0';
-                    this.pauseVideo(cardData);
-                });
             }
-            
-            // Touch events (mobile)
-            if (isMobile) {
-                card.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    if (isIOS && !cardData.activated) {
-                        if (playContainer) playContainer.style.opacity = '1';
-                    }
-                });
-                
-                card.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    if (cardData.playing) {
-                        this.openVideoModal(cardData);
-                    } else {
-                        this.playVideo(cardData);
-                    }
-                });
-            }
-            
-            // Video events
-            video.addEventListener('canplay', () => {
-                console.log(`✅ Video ${cardData.index} can play`);
-                cardData.activated = true;
-            });
-            
-            video.addEventListener('play', () => {
-                cardData.playing = true;
-                if (playContainer) playContainer.style.opacity = '0';
-            });
-            
-            video.addEventListener('pause', () => {
-                cardData.playing = false;
-            });
-            
-            video.addEventListener('error', (e) => {
-                console.error(`❌ Video ${cardData.index} error:`, e);
-                this.handleVideoError(cardData);
-            });
+        }, 300);
+    }
+    
+    // ===============================
+    // VIDEO SOURCE TAPMA FUNKSİYASI
+    // ===============================
+    
+    function getVideoSource(video) {
+        // Müxtəlif source variantlarını yoxla
+        if (video.src) {
+            return video.src;
         }
         
-        async playVideo(cardData) {
-            const { video, playBtn } = cardData;
-            
-            try {
-                // Loading state
-                if (playBtn) playBtn.innerHTML = '⏳';
-                
-                // iOS üçün xüsusi hazırlıq
-                if (isIOS && !this.userInteracted) {
-                    console.log('⚠️ Waiting for user interaction...');
-                    return;
-                }
-                
-                // Video hazırlığını yoxla
-                if (video.readyState < 3) {
-                    video.load();
-                    await this.waitForVideo(video);
-                }
-                
-                // Səssiz rejimi təmin et
-                video.muted = true;
-                video.currentTime = 0;
-                
-                // Oynatmağa çalış
-                const playPromise = video.play();
-                
-                if (playPromise !== undefined) {
-                    await playPromise;
-                    console.log(`▶️ Video ${cardData.index} playing`);
-                } else {
-                    throw new Error('Play promise undefined');
-                }
-                
-            } catch (error) {
-                console.error(`❌ Play failed for video ${cardData.index}:`, error);
-                this.handleVideoError(cardData);
+        if (video.dataset.src) {
+            return video.dataset.src;
+        }
+        
+        // Source elementləri yoxla
+        const sources = video.querySelectorAll('source');
+        for (let source of sources) {
+            if (source.src) {
+                return source.src;
+            }
+            if (source.dataset.src) {
+                return source.dataset.src;
             }
         }
         
-        pauseVideo(cardData) {
-            const { video } = cardData;
-            
-            if (video && !video.paused) {
-                video.pause();
-                video.currentTime = 0;
-            }
+        // CurrentSrc yoxla
+        if (video.currentSrc) {
+            return video.currentSrc;
         }
         
-        waitForVideo(video) {
-            return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('Video load timeout'));
-                }, 5000);
-                
-                const onReady = () => {
-                    clearTimeout(timeout);
-                    video.removeEventListener('canplay', onReady);
-                    video.removeEventListener('error', onError);
-                    resolve();
-                };
-                
-                const onError = (e) => {
-                    clearTimeout(timeout);
-                    video.removeEventListener('canplay', onReady);
-                    video.removeEventListener('error', onError);
-                    reject(e);
-                };
-                
-                if (video.readyState >= 3) {
-                    resolve();
-                } else {
-                    video.addEventListener('canplay', onReady);
-                    video.addEventListener('error', onError);
-                }
-            });
-        }
+        return null;
+    }
+    
+    // ===============================
+    // DÜZGUN COUNTER SİSTEMİ
+    // ===============================
+    
+    function updateModalCounterFixed(currentIndex) {
+        const modal = document.getElementById('videoModal') || 
+                     document.querySelector('.video-modal');
         
-        handleVideoError(cardData) {
-            const { playBtn, card } = cardData;
-            
-            if (playBtn) {
-                playBtn.innerHTML = '⚠️';
-                playBtn.style.background = '#ff4444';
-            }
-            
-            // Fallback şəkil
-            this.createFallbackImage(cardData);
-        }
+        if (!modal) return;
         
-        createFallbackImage(cardData) {
-            const { card, video } = cardData;
-            
-            const fallback = document.createElement('div');
-            fallback.className = 'video-fallback';
-            fallback.style.cssText = `
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(45deg, #333 0%, #555 50%, #333 100%);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: white;
-                font-family: 'Montserrat', sans-serif;
-                text-align: center;
-                z-index: 5;
-            `;
-            
-            fallback.innerHTML = `
-                <div>
-                    <div style="font-size: 2rem; margin-bottom: 10px;">🎥</div>
-                    <div>Video yüklənə bilmir</div>
-                </div>
-            `;
-            
-            card.style.position = 'relative';
-            card.appendChild(fallback);
-            
-            // Video-nu gizlət
-            video.style.display = 'none';
-        }
+        const currentCounter = modal.querySelector('#currentVideo, [class*="current"]');
+        const totalCounter = modal.querySelector('#totalVideos, [class*="total"]');
         
-        openVideoModal(cardData) {
-            // Modal açmaq üçün mövcud kod
-            const videoIndex = this.videoCards.indexOf(cardData);
-            if (videoIndex !== -1 && window.openVideoModal) {
-                window.openVideoModal(videoIndex);
-            }
-        }
-        
-        setupIntersectionObserver() {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    const cardIndex = this.videoCards.findIndex(card => card.card === entry.target);
-                    
-                    if (cardIndex !== -1) {
-                        const cardData = this.videoCards[cardIndex];
-                        
-                        if (!entry.isIntersecting) {
-                            this.pauseVideo(cardData);
-                        }
-                    }
-                });
-            }, {
-                rootMargin: '50px',
-                threshold: 0.1
-            });
+        if (currentCounter && totalCounter) {
+            // Sadəcə array index + 1
+            currentCounter.textContent = currentIndex + 1;
+            totalCounter.textContent = modalVideoCards.length;
             
-            this.videoCards.forEach(cardData => {
-                observer.observe(cardData.card);
-            });
+            console.log(`📊 Counter yeniləndi: ${currentIndex + 1}/${modalVideoCards.length}`);
         }
     }
     
     // ===============================
-    // SİSTEMİ İŞƏ SAL
+    // MODAL NAVİQASİYA DÜZƏLİŞİ
     // ===============================
     
-    // Video manager-i başlat
-    const videoManager = new iOSVideoManager();
-    
-    // Global erişim üçün
-    window.iOSVideoManager = videoManager;
-    
-    console.log(`🚀 iOS Video Manager initialized with ${videoManager.videoCards.length} videos`);
-    
-    // Debug məlumatları
-    setTimeout(() => {
-        console.log('📊 Video Cards Status:');
-        videoManager.videoCards.forEach((card, index) => {
-            console.log(`Video ${index}:`, {
-                activated: card.activated,
-                playing: card.playing,
-                readyState: card.video.readyState,
-                src: card.video.src || 'No source'
+    function setupModalNavigationFixed() {
+        const modal = document.getElementById('videoModal') || 
+                     document.querySelector('.video-modal');
+        
+        if (!modal) return;
+        
+        // Navigation düymələri
+        const prevBtn = modal.querySelector('.video-modal-prev, .lightbox-prev');
+        const nextBtn = modal.querySelector('.video-modal-next, .lightbox-next');
+        
+        // Previous button
+        if (prevBtn) {
+            // Köhnə listener-ləri sil
+            prevBtn.replaceWith(prevBtn.cloneNode(true));
+            const newPrevBtn = modal.querySelector('.video-modal-prev, .lightbox-prev');
+            
+            newPrevBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const newIndex = currentModalIndex === 0 
+                    ? modalVideoCards.length - 1 
+                    : currentModalIndex - 1;
+                
+                console.log(`⬅️ Previous: ${currentModalIndex} → ${newIndex}`);
+                
+                currentModalIndex = newIndex;
+                openVideoModalFixed(newIndex);
             });
-        });
-    }, 2000);
+        }
+        
+        // Next button
+        if (nextBtn) {
+            // Köhnə listener-ləri sil
+            nextBtn.replaceWith(nextBtn.cloneNode(true));
+            const newNextBtn = modal.querySelector('.video-modal-next, .lightbox-next');
+            
+            newNextBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const newIndex = (currentModalIndex + 1) % modalVideoCards.length;
+                
+                console.log(`➡️ Next: ${currentModalIndex} → ${newIndex}`);
+                
+                currentModalIndex = newIndex;
+                openVideoModalFixed(newIndex);
+            });
+        }
+        
+        console.log('✅ Modal naviqasiya düzəldildi');
+    }
     
+    // ===============================
+    // KEYBOARD NAVİQASİYA
+    // ===============================
+    
+    function setupKeyboardNavigationFixed() {
+        // Köhnə keyboard listener-ləri sil
+        document.removeEventListener('keydown', handleKeyboardNavigation);
+        
+        document.addEventListener('keydown', handleKeyboardNavigation);
+        
+        function handleKeyboardNavigation(e) {
+            const modal = document.getElementById('videoModal') || 
+                         document.querySelector('.video-modal');
+            
+            if (!modal || !modal.classList.contains('active')) return;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    const prevIndex = currentModalIndex === 0 
+                        ? modalVideoCards.length - 1 
+                        : currentModalIndex - 1;
+                    
+                    currentModalIndex = prevIndex;
+                    openVideoModalFixed(prevIndex);
+                    break;
+                    
+                case 'ArrowRight':
+                    e.preventDefault();
+                    const nextIndex = (currentModalIndex + 1) % modalVideoCards.length;
+                    
+                    currentModalIndex = nextIndex;
+                    openVideoModalFixed(nextIndex);
+                    break;
+                    
+                case 'Escape':
+                    closeModalFixed();
+                    break;
+            }
+        }
+        
+        console.log('⌨️ Keyboard naviqasiya quruldu');
+    }
+    
+    // ===============================
+    // MODAL BAĞLAMA
+    // ===============================
+    
+    function closeModalFixed() {
+        const modal = document.getElementById('videoModal') || 
+                     document.querySelector('.video-modal');
+        
+        if (!modal) return;
+        
+        modal.classList.remove('active');
+        document.body.style.overflow = 'auto';
+        document.body.style.overflowY = 'auto';
+        document.body.style.overflowX = 'hidden';
+        
+        const modalVideo = modal.querySelector('video');
+        if (modalVideo) {
+            modalVideo.pause();
+            modalVideo.currentTime = 0;
+            modalVideo.src = '';
+        }
+        
+        console.log('❌ Modal bağlandı');
+    }
+    
+    function setupModalClosingFixed() {
+        const modal = document.getElementById('videoModal') || 
+                     document.querySelector('.video-modal');
+        
+        if (!modal) return;
+        
+        // Close button
+        const closeBtn = modal.querySelector('.video-modal-close, .lightbox-close');
+        if (closeBtn) {
+            closeBtn.replaceWith(closeBtn.cloneNode(true));
+            const newCloseBtn = modal.querySelector('.video-modal-close, .lightbox-close');
+            newCloseBtn.addEventListener('click', closeModalFixed);
+        }
+        
+        // Overlay
+        const overlay = modal.querySelector('.video-modal-overlay, .lightbox-overlay');
+        if (overlay) {
+            overlay.replaceWith(overlay.cloneNode(true));
+            const newOverlay = modal.querySelector('.video-modal-overlay, .lightbox-overlay');
+            newOverlay.addEventListener('click', closeModalFixed);
+        }
+        
+        console.log('✅ Modal bağlama quruldu');
+    }
+    
+    // ===============================
+    // SİSTEMİ YENİDƏN BAŞLAT
+    // ===============================
+    
+    function reinitializeVideoSystem() {
+        console.log('🔄 Video sistem yenidən başladılır...');
+        
+        // 1. Modal sistemi yenidən qur
+        rebuildModalSystem();
+        
+        // 2. Modal naviqasiya qur
+        setupModalNavigationFixed();
+        
+        // 3. Modal bağlama qur
+        setupModalClosingFixed();
+        
+        // 4. Keyboard naviqasiya qur
+        setupKeyboardNavigationFixed();
+        
+        console.log('✅ Video sistem hazırdır!');
+        console.log(`📊 ${modalVideoCards.length} video kartı hazırlandı`);
+    }
+    
+    // ===============================
+    // BAŞLATMA
+    // ===============================
+    
+    // Dərhal başlat
+    reinitializeVideoSystem();
+    
+    // 500ms sonra yenidən başlat (əmin olmaq üçün)
+    setTimeout(reinitializeVideoSystem, 500);
+    
+    // 2 saniyə sonra da (DOM tam yüklənəndən sonra)
+    setTimeout(reinitializeVideoSystem, 2000);
+    
+    // Global funksiya olaraq təqdim et
+    window.fixVideoCards = reinitializeVideoSystem;
+    
+    console.log('🎯 Video kart click düzəlişi tamamlandı!');
+    console.log('🧪 Test üçün: fixVideoCards()');
 });
+
+// ===============================
+// DEBUG VƏ TEST FUNKSİYALARI
+// ===============================
+
+// Test funksiyası
+window.testVideoCardClick = function() {
+    console.log('🧪 Video kart test başlayır...');
+    
+    const cards = document.querySelectorAll('.work-card');
+    console.log(`📊 Tapılan kartlar: ${cards.length}`);
+    
+    cards.forEach((card, index) => {
+        const video = card.querySelector('video, .work-video');
+        console.log(`Kart ${index}:`, {
+            hasVideo: !!video,
+            videoSrc: video?.src || video?.dataset?.src || 'YOX',
+            clickListeners: card.onclick ? 'VAR' : 'YOX'
+        });
+    });
+    
+    const modal = document.getElementById('videoModal');
+    console.log(`Modal: ${modal ? '✅ VAR' : '❌ YOX'}`);
+};
+
+// Manuel modal açma testi
+window.testOpenModal = function(index = 0) {
+    console.log(`🧪 Modal test: ${index} nömrəli kartı açır...`);
+    
+    if (typeof openVideoModalFixed === 'function') {
+        openVideoModalFixed(index);
+    } else {
+        console.error('❌ openVideoModalFixed funksiyası tapılmadı');
+    }
+};
+
+console.log('🎯 Video düzəliş yükləndi!');
+console.log('🧪 Test funksiyaları: testVideoCardClick(), testOpenModal(index)');
 }
     </script>
 </body>

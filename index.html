@@ -1374,7 +1374,6 @@
             <ul class="nav-links">
                 <li><a href="#home">Home</a></li>
                 <li><a href="#reels">Reels</a></li>
-                <li><a href="#about">About</a></li>
                 <li><a href="#works">Works</a></li>
                 <li><a href="#contact">Contact</a></li>
             </ul>
@@ -1391,7 +1390,6 @@
         <ul class="nav-links">
             <li><a href="#home">Home</a></li>
              <li><a href="#reels">Reels</a></li>
-            <li><a href="#about">About</a></li>
             <li><a href="#works">Works</a></li>
             <li><a href="#contact">Contact</a></li>
         </ul>
@@ -1412,7 +1410,7 @@
     </section>
 
        <!-- Reels Section -->
-<section class="section reels-container">
+<section class="section reels-container" id="reels">
     <h2 class="section-title">Featured Reels</h2>
     <div class="reels-grid">
         <div class="work-card" data-category="reels">
@@ -1712,6 +1710,363 @@
     </section>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎯 Section-based Video Lazy Loading başlayır...');
+    
+    // ===============================
+    // 1. VİDEO KATEQORİYALARI
+    // ===============================
+    
+    const videoSections = {
+        'welcome': {
+            loaded: false,
+            selectors: [
+                '.hero-video',
+                '.welcome-section video',
+                '#hero video',
+                '[class*="hero"] video'
+            ]
+        },
+        'featured': {
+            loaded: false,
+            selectors: [
+                '.featured-reels video',
+                '.featured-section video',
+                '[class*="featured"] video',
+                '.reel-card video' // Featured reels kartları
+            ]
+        },
+        'reels': {
+            loaded: false,
+            selectors: [
+                '.reels-section video',
+                '#reels video',
+                '[data-category="reels"] video',
+                '.work-card[data-category="reels"] video'
+            ]
+        },
+        'works': {
+            loaded: false,
+            selectors: [
+                '.works-section video',
+                '.work-section video',
+                '#works video',
+                '.work-card video:not([data-category="reels"])'
+            ]
+        },
+        'about': {
+            loaded: false,
+            selectors: [
+                '.about-section video',
+                '#about video'
+            ]
+        }
+    };
+    
+    // ===============================
+    // 2. İLK YÜKLƏMƏ - SADƏCƏ WELCOME VƏ FEATURED
+    // ===============================
+    
+    function loadInitialVideos() {
+        console.log('🚀 İlk videolar yüklənir: Welcome və Featured');
+        
+        // Welcome section videolarını yüklə
+        loadSectionVideos('welcome');
+        
+        // Featured reels videolarını yüklə  
+        loadSectionVideos('featured');
+        
+        // Digər sectionların videolarını gizlə
+        hideSectionVideos(['reels', 'works', 'about']);
+    }
+    
+    // ===============================
+    // 3. SECTİON VİDEOLARINI YÜKLƏMƏ
+    // ===============================
+    
+    function loadSectionVideos(sectionName) {
+        if (!videoSections[sectionName]) {
+            console.warn(`⚠️ Section tapılmadı: ${sectionName}`);
+            return;
+        }
+        
+        if (videoSections[sectionName].loaded) {
+            console.log(`✅ ${sectionName} artıq yüklənib`);
+            return;
+        }
+        
+        console.log(`📥 ${sectionName} section videoları yüklənir...`);
+        
+        const selectors = videoSections[sectionName].selectors;
+        let loadedCount = 0;
+        
+        selectors.forEach(selector => {
+            const videos = document.querySelectorAll(selector);
+            
+            videos.forEach((video, index) => {
+                // Artıq yüklənib?
+                if (video.src || video.dataset.loaded === 'true') {
+                    return;
+                }
+                
+                // data-src-dan src-a köçür
+                if (video.dataset.src) {
+                    console.log(`🎬 Video yüklənir: ${sectionName} - ${selector} [${index}]`);
+                    video.src = video.dataset.src;
+                    video.load();
+                    video.dataset.loaded = 'true';
+                    loadedCount++;
+                }
+                
+                // Source tagları üçün
+                const sources = video.querySelectorAll('source[data-src]');
+                sources.forEach(source => {
+                    if (source.dataset.src && !source.src) {
+                        source.src = source.dataset.src;
+                        video.load();
+                        loadedCount++;
+                    }
+                });
+            });
+        });
+        
+        videoSections[sectionName].loaded = true;
+        console.log(`✅ ${sectionName} tamamlandı: ${loadedCount} video yükləndi`);
+    }
+    
+    // ===============================
+    // 4. SECTİON VİDEOLARINI GİZLƏMƏ
+    // ===============================
+    
+    function hideSectionVideos(sectionNames) {
+        sectionNames.forEach(sectionName => {
+            if (!videoSections[sectionName]) return;
+            
+            const selectors = videoSections[sectionName].selectors;
+            
+            selectors.forEach(selector => {
+                const videos = document.querySelectorAll(selector);
+                
+                videos.forEach(video => {
+                    // Src-i data-src-ə köçür (əgər artıq data-src yoxdursa)
+                    if (video.src && !video.dataset.src) {
+                        video.dataset.src = video.src;
+                        video.removeAttribute('src');
+                        video.load();
+                    }
+                    
+                    // Source tagları üçün
+                    const sources = video.querySelectorAll('source[src]');
+                    sources.forEach(source => {
+                        if (source.src && !source.dataset.src) {
+                            source.dataset.src = source.src;
+                            source.removeAttribute('src');
+                        }
+                    });
+                    
+                    if (sources.length > 0) {
+                        video.load();
+                    }
+                });
+            });
+            
+            console.log(`🙈 ${sectionName} videoları gizləndi (memory save)`);
+        });
+    }
+    
+    // ===============================
+    // 5. SECTİON VİSİBİLİTY OBSERVER
+    // ===============================
+    
+    const sectionObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const sectionElement = entry.target;
+                const sectionName = getSectionName(sectionElement);
+                
+                if (sectionName) {
+                    console.log(`👁️ Section görünür: ${sectionName}`);
+                    loadSectionVideos(sectionName);
+                }
+            }
+        });
+    }, {
+        threshold: 0.1, // 10% görünəndə yüklə
+        rootMargin: '50px' // 50px əvvəl yüklə
+    });
+    
+    // ===============================
+    // 6. SECTİON ADINI MÜƏYYƏN ETMƏ
+    // ===============================
+    
+    function getSectionName(element) {
+        // ID-dən
+        if (element.id) {
+            const id = element.id.toLowerCase();
+            if (videoSections[id]) return id;
+        }
+        
+        // Class-dan
+        const classList = element.className.toLowerCase();
+        
+        if (classList.includes('reels')) return 'reels';
+        if (classList.includes('works') || classList.includes('work')) return 'works';
+        if (classList.includes('about')) return 'about';
+        if (classList.includes('hero') || classList.includes('welcome')) return 'welcome';
+        if (classList.includes('featured')) return 'featured';
+        
+        return null;
+    }
+    
+    // ===============================
+    // 7. SECTİON ELEMENTLƏRINI TAPMA VƏ OBSERVE ETMƏ
+    // ===============================
+    
+    function observeSections() {
+        console.log('👀 Sectionlar observe edilir...');
+        
+        // Sectionları tap
+        const sections = document.querySelectorAll(`
+            #reels, #works, #about,
+            .reels-section, .works-section, .about-section,
+            .section, section,
+            [class*="reels"], [class*="works"], [class*="about"]
+        `);
+        
+        console.log(`📊 Tapılan section sayı: ${sections.length}`);
+        
+        sections.forEach(section => {
+            const sectionName = getSectionName(section);
+            if (sectionName && sectionName !== 'welcome' && sectionName !== 'featured') {
+                console.log(`🔍 Observe edilir: ${sectionName}`);
+                sectionObserver.observe(section);
+            }
+        });
+    }
+    
+    // ===============================
+    // 8. NAVİQASİYA CLİCK HANDLERİ
+    // ===============================
+    
+    function setupNavigationHandlers() {
+        console.log('🧭 Naviqasiya handlerləri qurulur...');
+        
+        // Naviqasiya linklərini tap
+        const navLinks = document.querySelectorAll(`
+            a[href*="#reels"], a[href*="#works"], a[href*="#about"],
+            .filter-btn, .nav-link, .menu-link,
+            [data-section], [data-filter]
+        `);
+        
+        navLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                const href = this.getAttribute('href');
+                const section = this.getAttribute('data-section') || 
+                               this.getAttribute('data-filter');
+                
+                let targetSection = null;
+                
+                // href-dən section müəyyən et
+                if (href && href.includes('#')) {
+                    targetSection = href.replace('#', '').toLowerCase();
+                }
+                
+                // data atributlarından
+                if (!targetSection && section) {
+                    targetSection = section.toLowerCase();
+                }
+                
+                // Text-dən
+                if (!targetSection) {
+                    const text = this.textContent.toLowerCase().trim();
+                    if (text.includes('reels')) targetSection = 'reels';
+                    else if (text.includes('works') || text.includes('work')) targetSection = 'works';
+                    else if (text.includes('about')) targetSection = 'about';
+                }
+                
+                if (targetSection && videoSections[targetSection]) {
+                    console.log(`🎯 Naviqasiya: ${targetSection} section-ına keçid`);
+                    
+                    // Klik edilən section-ı dərhal yüklə
+                    setTimeout(() => {
+                        loadSectionVideos(targetSection);
+                    }, 100);
+                }
+            });
+        });
+        
+        console.log(`✅ ${navLinks.length} naviqasiya linki quruldu`);
+    }
+    
+    // ===============================
+    // 9. HASH DEYİŞİKLİYİ HANDLERİ
+    // ===============================
+    
+    function setupHashChangeHandler() {
+        window.addEventListener('hashchange', function() {
+            const hash = window.location.hash.replace('#', '').toLowerCase();
+            
+            if (videoSections[hash]) {
+                console.log(`#️⃣ Hash dəyişdi: ${hash}`);
+                loadSectionVideos(hash);
+            }
+        });
+        
+        // İlk yüklənmədə hash yoxla
+        const initialHash = window.location.hash.replace('#', '').toLowerCase();
+        if (initialHash && videoSections[initialHash]) {
+            console.log(`🎯 İlk hash: ${initialHash}`);
+            setTimeout(() => {
+                loadSectionVideos(initialHash);
+            }, 500);
+        }
+    }
+    
+    // ===============================
+    // 10. MANUAL YÜKLƏMƏ FUNKSİYALARI
+    // ===============================
+    
+    window.loadSectionVideos = loadSectionVideos;
+    window.preloadAllVideos = function() {
+        console.log('🚀 Bütün videolar force yüklənir...');
+        Object.keys(videoSections).forEach(section => {
+            loadSectionVideos(section);
+        });
+    };
+    
+    // ===============================
+    // 11. İNİTİALİZASİYA
+    // ===============================
+    
+    function initializeLazyVideoSystem() {
+        console.log('🎬 Lazy Video System başlayır...');
+        
+        // 1. İlk videolar (Welcome + Featured)
+        loadInitialVideos();
+        
+        // 2. Section observe sistemi
+        setTimeout(observeSections, 500);
+        
+        // 3. Naviqasiya handlerləri
+        setTimeout(setupNavigationHandlers, 800);
+        
+        // 4. Hash change handlerləri
+        setupHashChangeHandler();
+        
+        console.log('✅ Lazy Video System hazırdır!');
+        console.log('🎯 Manual yükləmə: loadSectionVideos("reels") və ya preloadAllVideos()');
+    }
+    
+    // Başlat
+    initializeLazyVideoSystem();
+    
+    // Debug məlumatı
+    window.videoSectionStatus = function() {
+        console.table(videoSections);
+    };
+});
+
+console.log('🎬 Section-based Video Lazy Loading sistemi başladı');
+document.addEventListener('DOMContentLoaded', function() {
     console.log('JavaScript loaded successfully');
     let activeRequests = 0;
 const maxConcurrent = 3;

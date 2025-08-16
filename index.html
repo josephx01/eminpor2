@@ -5191,670 +5191,437 @@ window.testOpenModal = function(index = 0) {
 
 console.log('🎯 Video düzəliş yükləndi!');
 console.log('🧪 Test funksiyaları: testVideoCardClick(), testOpenModal(index)');
-// ===============================
-// ===============================
-// iOS VIDEO THUMBNAIL FIX - MINIMAL VERSION
-// Yalnız iOS-da video thumbnail problemi həll edir
-// Mövcud dizayna toxunmur!
-// ===============================
-
+// iOS Video problemini həll edən təkmilləşdirilmiş kod
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🍎 iOS video thumbnail fix - minimal version');
     
-    // iOS müəyyənləşdirmə
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    // iOS və Safari aşkarlanması
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isMobile = window.innerWidth <= 768;
     
-    console.log(`iOS cihaz: ${isIOS ? 'BƏLİ' : 'XEYR'}`);
-    
-    // Yalnız iOS-da işləsin
-    if (!isIOS) {
-        console.log('❌ iOS deyil - script dayandırılır');
-        return;
-    }
+    console.log(`📱 Device Detection: iOS=${isIOS}, Safari=${isSafari}, Mobile=${isMobile}`);
     
     // ===============================
-    // YALNIZ POSTER OLMAYAN VIDEOLAR ÜÇÜN FIX
+    // iOS VIDEO HƏLL SİSTEMİ
     // ===============================
     
-    function fixIOSVideoThumbnails() {
-        const videos = document.querySelectorAll('video');
-        let fixedCount = 0;
+    class iOSVideoManager {
+        constructor() {
+            this.videoCards = [];
+            this.userInteracted = false;
+            this.init();
+        }
         
-        videos.forEach((video, index) => {
-            // Artıq fix edilib?
-            if (video.dataset.iosThumbnailFixed === 'true') return;
-            
-            // Poster var?
-            const hasPoster = video.poster && video.poster.trim() !== '';
-            
-            if (hasPoster) {
-                console.log(`✅ Video ${index} - poster var, keçilir`);
-                return;
-            }
-            
-            console.log(`🔧 Video ${index} - poster yox, düzəldilir...`);
-            
-            // iOS üçün video atributları
-            video.setAttribute('playsinline', '');
-            video.setAttribute('webkit-playsinline', '');
-            video.preload = 'metadata';
-            
-            // Thumbnail yaratmağa çalış
-            createIOSThumbnail(video, index);
-            
-            video.dataset.iosThumbnailFixed = 'true';
-            fixedCount++;
-        });
+        init() {
+            this.setupUserInteraction();
+            this.processAllVideos();
+            this.setupIntersectionObserver();
+        }
         
-        console.log(`✅ ${fixedCount} video iOS üçün düzəldildi`);
-    }
-    
-    // ===============================
-    // IOS ÜÇÜN THUMBNAIL YARATMA
-    // ===============================
-    
-    function createIOSThumbnail(video, index) {
-        // Video metadata yüklənəndə
-        const handleLoadedData = function() {
-            try {
-                // Canvas yarad
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
+        setupUserInteraction() {
+            // İstifadəçi ilk toxunuşu - vacib iOS üçün
+            const enableInteraction = () => {
+                this.userInteracted = true;
+                console.log('✅ User interaction registered');
                 
-                // Video ölçüləri
-                canvas.width = video.videoWidth || 640;
-                canvas.height = video.videoHeight || 360;
-                
-                // İlk frame çək (0.1 saniyə)
-                video.currentTime = 0.1;
-                
-                video.addEventListener('seeked', function() {
-                    try {
-                        // Frame-i canvas-a çək
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        
-                        // Data URL yarad
-                        const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.7);
-                        
-                        // Video-ya poster kimi təyin et
-                        video.poster = thumbnailUrl;
-                        
-                        console.log(`📸 Video ${index} üçün iOS thumbnail yaradıldı`);
-                        
-                    } catch (error) {
-                        console.warn(`⚠️ Video ${index} thumbnail xətası:`, error.message);
-                        
-                        // CORS xətası - sadə poster təyin et
-                        if (error.name === 'SecurityError') {
-                            video.poster = createSimplePoster(index);
-                        }
+                // Bütün videoları hazırla
+                this.videoCards.forEach(card => {
+                    if (card.video && !card.activated) {
+                        this.prepareVideo(card);
                     }
-                }, { once: true });
-                
-            } catch (error) {
-                console.warn(`⚠️ Video ${index} canvas xətası:`, error.message);
-                video.poster = createSimplePoster(index);
-            }
-            
-            video.removeEventListener('loadeddata', handleLoadedData);
-        };
-        
-        // Video hazır olub?
-        if (video.readyState >= 1) {
-            handleLoadedData();
-        } else {
-            video.addEventListener('loadeddata', handleLoadedData, { once: true });
-            
-            // 3 saniyə timeout
-            setTimeout(() => {
-                video.removeEventListener('loadeddata', handleLoadedData);
-                console.warn(`⚠️ Video ${index} metadata timeout`);
-                video.poster = createSimplePoster(index);
-            }, 3000);
-        }
-    }
-    
-    // ===============================
-    // SADƏ POSTER YARATMA (CORS PROBLEMI ÜÇÜN)
-    // ===============================
-    
-    function createSimplePoster(index) {
-        // 1x1 şəffaf PNG (minimal impact)
-        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
-    }
-    
-    // ===============================
-    // İNİTİALİZASİYA
-    // ===============================
-    
-    console.log('🚀 iOS video thumbnail fix başlayır...');
-    
-    // Dərhal çalışdır
-    fixIOSVideoThumbnails();
-    
-    // 1 saniyə sonra yenidən (DOM tam yüklənəndə)
-    setTimeout(fixIOSVideoThumbnails, 1000);
-    
-    // Global funksiya
-    window.fixIOSVideos = fixIOSVideoThumbnails;
-    
-    console.log('✅ iOS video thumbnail fix hazırdır');
-});
-
-console.log('🍎 iOS Video Thumbnail Fix (Minimal) yükləndi');
-// HTML-dəki video strukturunu düzəltmək üçün kod
-document.addEventListener('DOMContentLoaded', function() {
-    
-    console.log('🔧 Fixing video structure for iOS compatibility...');
-    
-    // ===============================
-    // VIDEO STRUCTURE FİX
-    // ===============================
-    
-    function fixVideoStructure() {
-        const workCards = document.querySelectorAll('.work-card');
-        let fixedVideos = 0;
-        
-        workCards.forEach((card, index) => {
-            const video = card.querySelector('video, .work-video');
-            
-            if (video) {
-                fixVideoElement(video, card, index);
-                fixedVideos++;
-            }
-        });
-        
-        console.log(`✅ Fixed ${fixedVideos} videos for iOS compatibility`);
-    }
-    
-    function fixVideoElement(video, card, index) {
-        // 1. Video atributlarını düzəlt
-        video.setAttribute('playsinline', '');
-        video.setAttribute('webkit-playsinline', '');
-        video.setAttribute('muted', '');
-        video.muted = true;
-        video.preload = 'metadata';
-        video.controls = false;
-        
-        // 2. Class əlavə et
-        if (!video.classList.contains('work-video')) {
-            video.classList.add('work-video');
-        }
-        
-        // 3. Source elementlərini yoxla və düzəlt
-        fixVideoSources(video);
-        
-        // 4. Poster əlavə et (opsional)
-        if (!video.poster && !video.getAttribute('poster')) {
-            video.poster = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiMxYTFhMWEiLz48L3N2Zz4=';
-        }
-        
-        // 5. Container pozisiyasını düzəlt
-        if (card && getComputedStyle(card).position === 'static') {
-            card.style.position = 'relative';
-        }
-        
-        console.log(`🔧 Fixed video ${index + 1}`);
-    }
-    
-    function fixVideoSources(video) {
-        const sources = video.querySelectorAll('source');
-        let hasValidSource = false;
-        
-        sources.forEach(source => {
-            const src = source.getAttribute('src');
-            
-            if (src) {
-                // Type atributu əlavə et/düzəlt
-                if (src.includes('.mp4')) {
-                    source.setAttribute('type', 'video/mp4');
-                    hasValidSource = true;
-                } else if (src.includes('.mov')) {
-                    // MOV faylları iOS-da daha yaxşı işləyir
-                    source.setAttribute('type', 'video/quicktime');
-                    hasValidSource = true;
-                } else if (src.includes('.webm')) {
-                    source.setAttribute('type', 'video/webm');
-                    hasValidSource = true;
-                }
-                
-                // Codecs atributunu sil (iOS-da problem yaradır)
-                if (source.hasAttribute('codecs')) {
-                    source.removeAttribute('codecs');
-                }
-            }
-        });
-        
-        // Əgər video src-i varsa source yarad
-        if (video.src && !hasValidSource) {
-            const source = document.createElement('source');
-            source.src = video.src;
-            
-            if (video.src.includes('.mp4')) {
-                source.type = 'video/mp4';
-            } else if (video.src.includes('.mov')) {
-                source.type = 'video/quicktime';
-            } else if (video.src.includes('.webm')) {
-                source.type = 'video/webm';
-            }
-            
-            video.appendChild(source);
-            hasValidSource = true;
-        }
-        
-        // Video-nu yenidən yüklə
-        if (hasValidSource) {
-            video.load();
-        }
-    }
-    
-    // ===============================
-    // MODAL VIDEO FİX
-    // ===============================
-    
-    function fixModalVideo() {
-        const modalVideo = document.querySelector('#modalVideo');
-        
-        if (modalVideo) {
-            modalVideo.setAttribute('playsinline', '');
-            modalVideo.setAttribute('webkit-playsinline', '');
-            modalVideo.muted = false; // Modal videolar səsli ola bilər
-            modalVideo.controls = true;
-            modalVideo.preload = 'metadata';
-            
-            console.log('🔧 Fixed modal video for iOS');
-        }
-    }
-    
-    // ===============================
-    // HERO VIDEO FİX
-    // ===============================
-    
-    function fixHeroVideo() {
-        const heroVideo = document.querySelector('.hero-video');
-        
-        if (heroVideo) {
-            heroVideo.setAttribute('playsinline', '');
-            heroVideo.setAttribute('webkit-playsinline', '');
-            heroVideo.muted = true;
-            heroVideo.autoplay = true;
-            heroVideo.loop = true;
-            heroVideo.preload = 'auto';
-            
-            // Autoplay üçün istifadəçi interaksiyasını gözlə
-            const enableHeroAutoplay = () => {
-                heroVideo.play().catch(e => {
-                    console.log('Hero video autoplay failed:', e);
                 });
             };
             
-            document.addEventListener('touchstart', enableHeroAutoplay, { once: true });
-            document.addEventListener('click', enableHeroAutoplay, { once: true });
-            
-            console.log('🔧 Fixed hero video for iOS');
+            document.addEventListener('touchstart', enableInteraction, { once: true, passive: true });
+            document.addEventListener('click', enableInteraction, { once: true, passive: true });
         }
-    }
-    
-    // ===============================
-    // REELS VIDEO FİX
-    // ===============================
-    
-    function fixReelsVideos() {
-        const reelsVideos = document.querySelectorAll('.reels-container video, .reel-video');
         
-        reelsVideos.forEach((video, index) => {
+        processAllVideos() {
+            const workCards = document.querySelectorAll('.work-card');
+            
+            workCards.forEach((card, index) => {
+                const video = card.querySelector('.work-video, video');
+                if (video) {
+                    this.createVideoCard(card, video, index);
+                }
+            });
+        }
+        
+        createVideoCard(card, video, index) {
+            const cardData = {
+                card: card,
+                video: video,
+                overlay: card.querySelector('.work-overlay'),
+                index: index,
+                activated: false,
+                playing: false
+            };
+            
+            // iOS üçün xüsusi ayarlar
+            if (isIOS) {
+                this.setupiOSVideo(cardData);
+            } else {
+                this.setupNormalVideo(cardData);
+            }
+            
+            this.videoCards.push(cardData);
+        }
+        
+        setupiOSVideo(cardData) {
+            const { video, card } = cardData;
+            
+            // iOS üçün məcburi atributlar
+            video.muted = true;
+            video.playsInline = true;
             video.setAttribute('playsinline', '');
             video.setAttribute('webkit-playsinline', '');
-            video.muted = true;
             video.preload = 'metadata';
             video.controls = false;
             
-            fixVideoSources(video);
+            // Video source-ları təmizlə və təkrar əlavə et
+            this.fixVideoSources(video);
             
-            console.log(`🔧 Fixed reel video ${index + 1}`);
-        });
-    }
-    
-    // ===============================
-    // HOVER EFFECTS VƏ PLAY/PAUSE
-    // ===============================
-    
-    function setupVideoInteractions() {
-        const videos = document.querySelectorAll('.work-video, .reel-video');
+            // Play button əlavə et
+            this.addPlayButton(cardData);
+            
+            // Event handler-lər
+            this.setupVideoEvents(cardData);
+        }
         
-        videos.forEach((video, index) => {
-            // Hover/Touch play/pause
-            let hoverTimeout;
+        setupNormalVideo(cardData) {
+            const { video } = cardData;
             
-            const playVideo = () => {
-                if (video.paused) {
-                    video.play().catch(e => {
-                        console.log(`Video ${index + 1} play failed:`, e);
-                    });
-                }
-            };
+            video.muted = true;
+            video.playsInline = true;
+            video.preload = 'metadata';
             
-            const pauseVideo = () => {
-                if (!video.paused) {
-                    video.pause();
-                }
-            };
-            
-            // Desktop hover events
-            video.addEventListener('mouseenter', () => {
-                clearTimeout(hoverTimeout);
-                hoverTimeout = setTimeout(playVideo, 200);
-            });
-            
-            video.addEventListener('mouseleave', () => {
-                clearTimeout(hoverTimeout);
-                pauseVideo();
-            });
-            
-            // Mobile touch events
-            video.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                playVideo();
-            });
-            
-            video.addEventListener('touchend', () => {
-                setTimeout(pauseVideo, 3000); // 3 saniyə sonra pause
-            });
-            
-            // Click events for modal
-            video.addEventListener('click', (e) => {
-                e.preventDefault();
-                openVideoModal(video);
-            });
-        });
+            this.setupVideoEvents(cardData);
+        }
         
-        console.log(`✅ Setup interactions for ${videos.length} videos`);
-    }
-    
-    // ===============================
-    // VIDEO MODAL SİSTEMİ
-    // ===============================
-    
-    function setupVideoModal() {
-        // Modal HTML yaratmaq
-        if (!document.querySelector('#videoModal')) {
-            const modalHTML = `
-                <div id="videoModal" class="video-modal" style="
-                    display: none;
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0, 0, 0, 0.9);
-                    z-index: 9999;
-                    padding: 20px;
-                    box-sizing: border-box;
-                ">
-                    <div class="modal-content" style="
-                        position: relative;
-                        width: 100%;
-                        height: 100%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                    ">
-                        <video id="modalVideo" style="
-                            max-width: 100%;
-                            max-height: 100%;
-                            width: auto;
-                            height: auto;
-                        " controls playsinline webkit-playsinline></video>
-                        <button id="closeModal" style="
-                            position: absolute;
-                            top: 10px;
-                            right: 10px;
-                            background: rgba(255, 255, 255, 0.2);
-                            border: none;
-                            color: white;
-                            font-size: 24px;
-                            padding: 10px;
-                            cursor: pointer;
-                            border-radius: 50%;
-                            width: 50px;
-                            height: 50px;
-                        ">×</button>
-                    </div>
+        fixVideoSources(video) {
+            // Mövcud source-ları götür
+            const sources = Array.from(video.querySelectorAll('source'));
+            const videoSrc = video.src;
+            
+            // Video-nu təmizlə
+            video.innerHTML = '';
+            video.removeAttribute('src');
+            
+            // MP4 source əlavə et (iOS üçün ən yaxşı)
+            if (videoSrc) {
+                const source = document.createElement('source');
+                source.src = videoSrc;
+                source.type = 'video/mp4';
+                video.appendChild(source);
+            }
+            
+            // Digər source-ları əlavə et
+            sources.forEach(source => {
+                if (source.src && source.src.includes('.mp4')) {
+                    const newSource = document.createElement('source');
+                    newSource.src = source.src;
+                    newSource.type = 'video/mp4';
+                    video.appendChild(newSource);
+                }
+            });
+            
+            // Video-nu yenidən yüklə
+            video.load();
+        }
+        
+        addPlayButton(cardData) {
+            const { card, video } = cardData;
+            
+            // Play button container
+            const playContainer = document.createElement('div');
+            playContainer.className = 'ios-play-container';
+            playContainer.style.cssText = `
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 10;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+            `;
+            
+            // Play button
+            const playBtn = document.createElement('button');
+            playBtn.className = 'ios-play-btn';
+            playBtn.innerHTML = '▶';
+            playBtn.style.cssText = `
+                background: rgba(255, 165, 0, 0.9);
+                border: none;
+                border-radius: 50%;
+                width: 60px;
+                height: 60px;
+                font-size: 20px;
+                color: white;
+                cursor: pointer;
+                pointer-events: auto;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+                transition: all 0.3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            playBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.playVideo(cardData);
+            });
+            
+            playContainer.appendChild(playBtn);
+            card.style.position = 'relative';
+            card.appendChild(playContainer);
+            
+            cardData.playContainer = playContainer;
+            cardData.playBtn = playBtn;
+        }
+        
+        setupVideoEvents(cardData) {
+            const { video, card, playContainer } = cardData;
+            
+            // Mouse events (desktop)
+            if (!isMobile) {
+                card.addEventListener('mouseenter', () => {
+                    if (isIOS && !cardData.activated) {
+                        if (playContainer) playContainer.style.opacity = '1';
+                    } else {
+                        this.playVideo(cardData);
+                    }
+                });
+                
+                card.addEventListener('mouseleave', () => {
+                    if (playContainer) playContainer.style.opacity = '0';
+                    this.pauseVideo(cardData);
+                });
+            }
+            
+            // Touch events (mobile)
+            if (isMobile) {
+                card.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (isIOS && !cardData.activated) {
+                        if (playContainer) playContainer.style.opacity = '1';
+                    }
+                });
+                
+                card.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (cardData.playing) {
+                        this.openVideoModal(cardData);
+                    } else {
+                        this.playVideo(cardData);
+                    }
+                });
+            }
+            
+            // Video events
+            video.addEventListener('canplay', () => {
+                console.log(`✅ Video ${cardData.index} can play`);
+                cardData.activated = true;
+            });
+            
+            video.addEventListener('play', () => {
+                cardData.playing = true;
+                if (playContainer) playContainer.style.opacity = '0';
+            });
+            
+            video.addEventListener('pause', () => {
+                cardData.playing = false;
+            });
+            
+            video.addEventListener('error', (e) => {
+                console.error(`❌ Video ${cardData.index} error:`, e);
+                this.handleVideoError(cardData);
+            });
+        }
+        
+        async playVideo(cardData) {
+            const { video, playBtn } = cardData;
+            
+            try {
+                // Loading state
+                if (playBtn) playBtn.innerHTML = '⏳';
+                
+                // iOS üçün xüsusi hazırlıq
+                if (isIOS && !this.userInteracted) {
+                    console.log('⚠️ Waiting for user interaction...');
+                    return;
+                }
+                
+                // Video hazırlığını yoxla
+                if (video.readyState < 3) {
+                    video.load();
+                    await this.waitForVideo(video);
+                }
+                
+                // Səssiz rejimi təmin et
+                video.muted = true;
+                video.currentTime = 0;
+                
+                // Oynatmağa çalış
+                const playPromise = video.play();
+                
+                if (playPromise !== undefined) {
+                    await playPromise;
+                    console.log(`▶️ Video ${cardData.index} playing`);
+                } else {
+                    throw new Error('Play promise undefined');
+                }
+                
+            } catch (error) {
+                console.error(`❌ Play failed for video ${cardData.index}:`, error);
+                this.handleVideoError(cardData);
+            }
+        }
+        
+        pauseVideo(cardData) {
+            const { video } = cardData;
+            
+            if (video && !video.paused) {
+                video.pause();
+                video.currentTime = 0;
+            }
+        }
+        
+        waitForVideo(video) {
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Video load timeout'));
+                }, 5000);
+                
+                const onReady = () => {
+                    clearTimeout(timeout);
+                    video.removeEventListener('canplay', onReady);
+                    video.removeEventListener('error', onError);
+                    resolve();
+                };
+                
+                const onError = (e) => {
+                    clearTimeout(timeout);
+                    video.removeEventListener('canplay', onReady);
+                    video.removeEventListener('error', onError);
+                    reject(e);
+                };
+                
+                if (video.readyState >= 3) {
+                    resolve();
+                } else {
+                    video.addEventListener('canplay', onReady);
+                    video.addEventListener('error', onError);
+                }
+            });
+        }
+        
+        handleVideoError(cardData) {
+            const { playBtn, card } = cardData;
+            
+            if (playBtn) {
+                playBtn.innerHTML = '⚠️';
+                playBtn.style.background = '#ff4444';
+            }
+            
+            // Fallback şəkil
+            this.createFallbackImage(cardData);
+        }
+        
+        createFallbackImage(cardData) {
+            const { card, video } = cardData;
+            
+            const fallback = document.createElement('div');
+            fallback.className = 'video-fallback';
+            fallback.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(45deg, #333 0%, #555 50%, #333 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-family: 'Montserrat', sans-serif;
+                text-align: center;
+                z-index: 5;
+            `;
+            
+            fallback.innerHTML = `
+                <div>
+                    <div style="font-size: 2rem; margin-bottom: 10px;">🎥</div>
+                    <div>Video yüklənə bilmir</div>
                 </div>
             `;
             
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            card.style.position = 'relative';
+            card.appendChild(fallback);
+            
+            // Video-nu gizlət
+            video.style.display = 'none';
         }
         
-        // Modal event listeners
-        const modal = document.querySelector('#videoModal');
-        const modalVideo = document.querySelector('#modalVideo');
-        const closeBtn = document.querySelector('#closeModal');
-        
-        closeBtn.addEventListener('click', closeVideoModal);
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                closeVideoModal();
+        openVideoModal(cardData) {
+            // Modal açmaq üçün mövcud kod
+            const videoIndex = this.videoCards.indexOf(cardData);
+            if (videoIndex !== -1 && window.openVideoModal) {
+                window.openVideoModal(videoIndex);
             }
-        });
-        
-        // ESC key ilə modal bağla
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.style.display === 'flex') {
-                closeVideoModal();
-            }
-        });
-        
-        console.log('✅ Video modal system setup complete');
-    }
-    
-    function openVideoModal(video) {
-        const modal = document.querySelector('#videoModal');
-        const modalVideo = document.querySelector('#modalVideo');
-        
-        if (modal && modalVideo) {
-            // Video source-u kopyala
-            modalVideo.src = video.src || video.querySelector('source')?.src || '';
-            
-            // Video atributlarını təyin et
-            modalVideo.muted = false;
-            modalVideo.controls = true;
-            modalVideo.setAttribute('playsinline', '');
-            modalVideo.setAttribute('webkit-playsinline', '');
-            
-            // Modal-ı göstər
-            modal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-            
-            // Video-nu yüklə və oyna
-            modalVideo.load();
-            modalVideo.play().catch(e => {
-                console.log('Modal video play failed:', e);
-            });
         }
-    }
-    
-    function closeVideoModal() {
-        const modal = document.querySelector('#videoModal');
-        const modalVideo = document.querySelector('#modalVideo');
         
-        if (modal && modalVideo) {
-            modalVideo.pause();
-            modalVideo.src = '';
-            modal.style.display = 'none';
-            document.body.style.overflow = '';
-        }
-    }
-    
-    // ===============================
-    // LAZY LOADING SİSTEMİ
-    // ===============================
-    
-    function setupLazyLoading() {
-        const videos = document.querySelectorAll('video[data-src]');
-        
-        const videoObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    const video = entry.target;
-                    const src = video.getAttribute('data-src');
+        setupIntersectionObserver() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const cardIndex = this.videoCards.findIndex(card => card.card === entry.target);
                     
-                    if (src) {
-                        video.src = src;
-                        video.removeAttribute('data-src');
-                        video.load();
+                    if (cardIndex !== -1) {
+                        const cardData = this.videoCards[cardIndex];
                         
-                        // Video düzəlişlərini tətbiq et
-                        fixVideoElement(video, video.closest('.work-card'));
+                        if (!entry.isIntersecting) {
+                            this.pauseVideo(cardData);
+                        }
                     }
-                    
-                    videoObserver.unobserve(video);
-                }
-            });
-        }, {
-            rootMargin: '50px'
-        });
-        
-        videos.forEach(video => {
-            videoObserver.observe(video);
-        });
-        
-        console.log(`✅ Setup lazy loading for ${videos.length} videos`);
-    }
-    
-    // ===============================
-    // PERFORMANCE MONİTORİNG
-    // ===============================
-    
-    function monitorVideoPerformance() {
-        const videos = document.querySelectorAll('video');
-        let loadErrors = 0;
-        let playErrors = 0;
-        
-        videos.forEach((video, index) => {
-            video.addEventListener('error', (e) => {
-                loadErrors++;
-                console.error(`Video ${index + 1} load error:`, e);
+                });
+            }, {
+                rootMargin: '50px',
+                threshold: 0.1
             });
             
-            video.addEventListener('loadstart', () => {
-                console.log(`Video ${index + 1} started loading`);
+            this.videoCards.forEach(cardData => {
+                observer.observe(cardData.card);
             });
-            
-            video.addEventListener('canplay', () => {
-                console.log(`Video ${index + 1} can play`);
-            });
-            
-            video.addEventListener('stalled', () => {
-                console.warn(`Video ${index + 1} stalled`);
-            });
-        });
-        
-        // Performance məlumatlarını göstər
-        setTimeout(() => {
-            console.log(`📊 Video Performance Report:
-                Total Videos: ${videos.length}
-                Load Errors: ${loadErrors}
-                Play Errors: ${playErrors}
-            `);
-        }, 5000);
+        }
     }
     
     // ===============================
     // SİSTEMİ İŞƏ SAL
     // ===============================
     
-    // Təcili düzəlişlər
-    fixVideoStructure();
-    fixModalVideo();
-    fixHeroVideo();
-    fixReelsVideos();
+    // Video manager-i başlat
+    const videoManager = new iOSVideoManager();
     
-    // Video modal sistemi qur
-    setupVideoModal();
+    // Global erişim üçün
+    window.iOSVideoManager = videoManager;
     
-    // Video interaksiyalarını qur
-    setupVideoInteractions();
+    console.log(`🚀 iOS Video Manager initialized with ${videoManager.videoCards.length} videos`);
     
-    // Lazy loading sistemi
-    setupLazyLoading();
-    
-    // Performance monitoring
-    monitorVideoPerformance();
-    
-    // Gecikmə ilə yenidən yoxla
+    // Debug məlumatları
     setTimeout(() => {
-        fixVideoStructure();
-        console.log('🔄 Re-checked video structure');
-    }, 1000);
-    
-    // Resize eventində yenidən düzəlt
-    window.addEventListener('resize', () => {
-        setTimeout(() => {
-            fixVideoStructure();
-            console.log('🔄 Re-fixed videos after resize');
-        }, 500);
-    });
-    
-    // Orientation dəyişikliyində yenidən düzəlt
-    window.addEventListener('orientationchange', () => {
-        setTimeout(() => {
-            fixVideoStructure();
-            setupVideoInteractions();
-            console.log('🔄 Re-fixed videos after orientation change');
-        }, 1000);
-    });
-    
-    // Network dəyişikliklərini izlə (opsional)
-    if ('connection' in navigator) {
-        navigator.connection.addEventListener('change', () => {
-            console.log('📶 Network changed, adjusting video quality...');
-            
-            const videos = document.querySelectorAll('video');
-            videos.forEach(video => {
-                if (navigator.connection.effectiveType === 'slow-2g' || 
-                    navigator.connection.effectiveType === '2g') {
-                    video.preload = 'none';
-                } else {
-                    video.preload = 'metadata';
-                }
+        console.log('📊 Video Cards Status:');
+        videoManager.videoCards.forEach((card, index) => {
+            console.log(`Video ${index}:`, {
+                activated: card.activated,
+                playing: card.playing,
+                readyState: card.video.readyState,
+                src: card.video.src || 'No source'
             });
         });
-    }
+    }, 2000);
     
-    console.log('✅ iOS Video Fix System fully initialized!');
-    
-}); // DOMContentLoaded sonu
-
-// ===============================
-// GLOBAL HELPER FUNKSİYALAR
-// ===============================
-
-// Video-nu əl ilə düzəltmək üçün
-window.fixVideo = function(videoElement) {
-    if (videoElement && videoElement.tagName === 'VIDEO') {
-        fixVideoElement(videoElement, videoElement.closest('.work-card'));
-        console.log('✅ Manually fixed video');
-    }
-};
-
-// Bütün video-ları yenidən düzəltmək üçün
-window.refreshAllVideos = function() {
-    document.dispatchEvent(new Event('DOMContentLoaded'));
-    console.log('🔄 Refreshed all videos');
-};
-
-// Video modal-ını əl ilə açmaq üçün
-window.openVideoInModal = function(videoSrc) {
-    const modalVideo = document.querySelector('#modalVideo');
-    if (modalVideo) {
-        modalVideo.src = videoSrc;
-        document.querySelector('#videoModal').style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-        modalVideo.play();
-    }
-};
+});
 }
     </script>
 </body>

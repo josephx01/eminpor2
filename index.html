@@ -2317,49 +2317,280 @@ let animationFrame = null;
             observer.observe(section);
         });
     });
+// ===============================
+// iOS VİDEO HOVER PREVIEW FIX
+// Bu kod mövcud reel cards və work cards kodunu əvəz edir
+// ===============================
 
-    // ===============================
-    // 8. REEL VIDEOS - OPTIMIZED
-    // ===============================
-    const reelCards = document.querySelectorAll('.reel-card');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📱 iOS Video Hover Preview Fix başlayır...');
     
-    reelCards.forEach(card => {
-        const video = card.querySelector('.reel-video');
-        if (video) {
-            // Preload only metadata
-            video.preload = 'metadata';
-            video.playsInline = true;
+    // iOS/Mobile cihaz müəyyənləşdirmə
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    console.log(`📱 Device: iOS=${isIOS}, Mobile=${isMobile}, Touch=${isTouchDevice}`);
+    
+    // ===============================
+    // 1. VİDEO PRELOAD DÜZƏLTMƏ (iOS ÜÇÜN)
+    // ===============================
+    
+    function fixVideoPreloading() {
+        const videos = document.querySelectorAll('video');
+        
+        videos.forEach((video, index) => {
+            // iOS üçün preload="none" problemi
+            if (isIOS || isMobile) {
+                if (video.getAttribute('preload') === 'none') {
+                    video.setAttribute('preload', 'metadata');
+                    console.log(`🔧 Video ${index}: preload none → metadata (iOS fix)`);
+                }
+            }
             
+            // iOS üçün vacib atributlar
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.muted = true; // Səssiz olmalı hover preview üçün
+            
+            // First frame yükləmək üçün
+            if (video.readyState < 1) {
+                video.load();
+            }
+        });
+    }
+    
+    // ===============================
+    // 2. UNIVERSAL HOVER/TOUCH PREVIEW SİSTEMİ
+    // ===============================
+    
+    function setupUniversalVideoPreview() {
+        // Həm reel cards həm də work cards
+        const videoCards = document.querySelectorAll('.reel-card, .work-card');
+        
+        console.log(`🎬 ${videoCards.length} video kart tapıldı`);
+        
+        videoCards.forEach((card, index) => {
+            const video = card.querySelector('video, .reel-video, .work-video');
+            if (!video) return;
+            
+            let isPlaying = false;
             let playPromise = null;
             
-            card.addEventListener('mouseenter', function() {
-                if (playPromise) return; // Prevent multiple plays
+            // ===============================
+            // DESKTOP: Mouse Events
+            // ===============================
+            
+            if (!isTouchDevice) {
+                // Mouse enter
+                card.addEventListener('mouseenter', function() {
+                    startVideoPreview(video, index, 'mouseenter');
+                }, { passive: true });
+                
+                // Mouse leave  
+                card.addEventListener('mouseleave', function() {
+                    stopVideoPreview(video, index, 'mouseleave');
+                }, { passive: true });
+            }
+            
+            // ===============================
+            // MOBILE/iOS: Touch Events
+            // ===============================
+            
+            if (isTouchDevice) {
+                let touchStartTime = 0;
+                let longPressTimer = null;
+                
+                // Touch start - uzun basma üçün
+                card.addEventListener('touchstart', function(e) {
+                    touchStartTime = Date.now();
+                    
+                    // 300ms sonra video preview göstər
+                    longPressTimer = setTimeout(() => {
+                        startVideoPreview(video, index, 'longpress');
+                    }, 300);
+                    
+                }, { passive: true });
+                
+                // Touch end
+                card.addEventListener('touchend', function(e) {
+                    const touchDuration = Date.now() - touchStartTime;
+                    
+                    // Long press timer-i sil
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                        longPressTimer = null;
+                    }
+                    
+                    // Əgər qısa toxunma idisə (tap), modal aç
+                    if (touchDuration < 300 && !isPlaying) {
+                        // Bu, klik event-i üçün normaldır - modal açılacaq
+                        console.log(`👆 Tap detected: ${index} - modal açılacaq`);
+                        return;
+                    }
+                    
+                    // Uzun basma idisə, preview-ı dayandır
+                    if (isPlaying) {
+                        stopVideoPreview(video, index, 'touchend');
+                    }
+                    
+                }, { passive: true });
+                
+                // Touch cancel
+                card.addEventListener('touchcancel', function() {
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                        longPressTimer = null;
+                    }
+                    if (isPlaying) {
+                        stopVideoPreview(video, index, 'touchcancel');
+                    }
+                }, { passive: true });
+            }
+            
+            // Video preview funksiyaları
+            function startVideoPreview(video, index, trigger) {
+                if (isPlaying || !video) return;
+                
+                console.log(`▶️ Video preview start: ${index} (${trigger})`);
                 
                 video.muted = true;
                 video.currentTime = 0;
-                playPromise = video.play().catch(e => {
-                    console.log('Reel video play failed:', e);
-                    playPromise = null;
-                });
-            }, { passive: true });
+                
+                playPromise = video.play();
+                
+                if (playPromise) {
+                    playPromise.then(() => {
+                        isPlaying = true;
+                        console.log(`✅ Video ${index} oynayır (${trigger})`);
+                    }).catch(error => {
+                        console.log(`⚠️ Video ${index} play error:`, error.message);
+                        isPlaying = false;
+                        playPromise = null;
+                    });
+                } else {
+                    isPlaying = true;
+                }
+            }
             
-            card.addEventListener('mouseleave', function() {
+            function stopVideoPreview(video, index, trigger) {
+                if (!isPlaying || !video) return;
+                
+                console.log(`⏸️ Video preview stop: ${index} (${trigger})`);
+                
                 if (playPromise) {
                     playPromise.then(() => {
                         video.pause();
                         video.currentTime = 0;
+                        isPlaying = false;
                         playPromise = null;
                     }).catch(() => {
+                        video.pause();
+                        video.currentTime = 0;
+                        isPlaying = false;
                         playPromise = null;
                     });
                 } else {
                     video.pause();
                     video.currentTime = 0;
+                    isPlaying = false;
                 }
-            }, { passive: true });
+            }
+        });
+    }
+    
+    // ===============================
+    // 3. KÖHNƏ EVENT LISTENER-LƏRI TƏMİZLƏMƏ
+    // ===============================
+    
+    function cleanupOldVideoEvents() {
+        console.log('🧹 Köhnə video event-lər təmizlənir...');
+        
+        const videoCards = document.querySelectorAll('.reel-card, .work-card');
+        
+        videoCards.forEach(card => {
+            // Kartı klonla və əvəzlə (bütün event-lər təmizlənsin)
+            const newCard = card.cloneNode(true);
+            card.parentNode.replaceChild(newCard, card);
+        });
+        
+        console.log('✅ Köhnə event-lər təmizləndi');
+    }
+    
+    // ===============================
+    // 4. İNTERVAL İLE YOXLAMA (YENİ KARTLAR ÜÇÜN)
+    // ===============================
+    
+    function setupPeriodicCheck() {
+        let lastCardCount = 0;
+        
+        setInterval(() => {
+            const currentCardCount = document.querySelectorAll('.reel-card, .work-card').length;
+            
+            if (currentCardCount !== lastCardCount) {
+                console.log(`🔄 Yeni kartlar tapıldı: ${lastCardCount} → ${currentCardCount}`);
+                
+                // Yenidən setup et
+                setTimeout(() => {
+                    fixVideoPreloading();
+                    setupUniversalVideoPreview();
+                }, 100);
+                
+                lastCardCount = currentCardCount;
+            }
+        }, 2000); // Hər 2 saniyədə yoxla
+    }
+    
+    // ===============================
+    // 5. İNİTİALİZASİYA
+    // ===============================
+    
+    function initializeVideoPreviewFix() {
+        console.log('🚀 Video Preview Fix başlayır...');
+        
+        // 1. Video preload düzəlt
+        fixVideoPreloading();
+        
+        // 2. Köhnə event-ləri təmizlə
+        setTimeout(cleanupOldVideoEvents, 100);
+        
+        // 3. Yeni preview sistemi qur
+        setTimeout(setupUniversalVideoPreview, 200);
+        
+        // 4. Periodic yoxlama başlat
+        setTimeout(setupPeriodicCheck, 1000);
+        
+        console.log('✅ Video Preview Fix hazırdır!');
+        
+        // Mobil üçün istifadə təlimatı
+        if (isTouchDevice) {
+            console.log('📱 Mobil cihaz: Video preview üçün kartı 300ms basıb saxlayın');
         }
-    });
+    }
+    
+    // Başlat
+    initializeVideoPreviewFix();
+    
+    // Global yenidən başlatma funksiyası
+    window.fixVideoPreview = initializeVideoPreviewFix;
+    
+    // Debug funksiyaları
+    window.testVideoPreview = function() {
+        const videos = document.querySelectorAll('video');
+        videos.forEach((video, i) => {
+            console.log(`Video ${i}:`, {
+                preload: video.preload,
+                readyState: video.readyState,
+                muted: video.muted,
+                playsinline: video.hasAttribute('playsinline')
+            });
+        });
+    };
+});
 
+console.log('📱 iOS Video Hover Preview Fix yükləndi!');
+   
     // ===============================
     // 9. LIGHTBOX FOR IMAGES - OPTIMIZED
     // ===============================
@@ -2923,11 +3154,6 @@ let animationFrame = null;
                 transition: all 0.3s ease;
                 border: 2px solid transparent;
                 will-change: transform, border-color, box-shadow;
-            }
-
-            .work-card:hover {
-                border: 2px solid #ffa500;
-                box-shadow: 0 0 20px rgba(255, 165, 0, 0.5);
             }
 
             .work-video {

@@ -2457,4 +2457,331 @@ window.addEventListener('load', () => {
 
     console.log('✅ Forced Reels section & filters to always be visible');
 });
+// ===============================
+// iOS VIDEO FALLBACK SYSTEM
+// Ultimate solution for iOS video issues
+// ===============================
+
+(function() {
+    'use strict';
+    
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    console.log(`📱 iOS Detection: ${isIOS}, Safari: ${isSafari}`);
+    
+    class iOSVideoFallback {
+        constructor() {
+            this.videos = [];
+            this.touchActivated = false;
+            this.init();
+        }
+        
+        init() {
+            if (!isIOS) {
+                console.log('✅ Not iOS, using normal video handling');
+                this.initNormalVideos();
+                return;
+            }
+            
+            console.log('🍎 iOS detected, applying fallback system');
+            this.removeProblematicAttributes();
+            this.createFallbackSystem();
+            this.setupTouchActivation();
+        }
+        
+        removeProblematicAttributes() {
+            // Remove all codecs attributes that break iOS
+            document.querySelectorAll('source[codecs]').forEach(source => {
+                source.removeAttribute('codecs');
+            });
+            
+            // Remove problematic video attributes
+            document.querySelectorAll('video').forEach(video => {
+                video.removeAttribute('loading');
+                video.removeAttribute('preload');
+                video.setAttribute('preload', 'none');
+            });
+        }
+        
+        createFallbackSystem() {
+            const videos = document.querySelectorAll('video');
+            
+            videos.forEach((video, index) => {
+                this.createVideoFallback(video, index);
+            });
+        }
+        
+        createVideoFallback(video, index) {
+            const container = video.closest('.work-card') || video.closest('.hero') || video.parentElement;
+            
+            // Create poster image from video first frame
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Create fallback poster
+            const poster = document.createElement('div');
+            poster.className = 'video-poster-fallback';
+            poster.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: linear-gradient(45deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                cursor: pointer;
+                z-index: 10;
+                transition: all 0.3s ease;
+            `;
+            
+            // Create play button
+            const playButton = document.createElement('div');
+            playButton.className = 'ios-video-play';
+            playButton.innerHTML = '▶️';
+            playButton.style.cssText = `
+                font-size: 48px;
+                margin-bottom: 16px;
+                background: rgba(255,255,255,0.1);
+                padding: 20px;
+                border-radius: 50%;
+                backdrop-filter: blur(10px);
+                border: 2px solid rgba(255,255,255,0.2);
+                animation: pulse 2s infinite;
+            `;
+            
+            // Create text
+            const text = document.createElement('div');
+            text.textContent = 'Tap to play video';
+            text.style.cssText = `
+                font-family: 'Montserrat', sans-serif;
+                font-size: 16px;
+                text-align: center;
+                opacity: 0.8;
+            `;
+            
+            poster.appendChild(playButton);
+            poster.appendChild(text);
+            
+            // Make container relative
+            if (container) {
+                container.style.position = 'relative';
+                container.appendChild(poster);
+            }
+            
+            // Setup video properly
+            this.setupiOSVideo(video, poster, index);
+            
+            // Add to tracking
+            this.videos.push({
+                element: video,
+                poster: poster,
+                container: container,
+                loaded: false,
+                playing: false
+            });
+        }
+        
+        setupiOSVideo(video, poster, index) {
+            // Essential iOS settings
+            video.muted = true;
+            video.playsInline = true;
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.preload = 'none';
+            video.controls = false;
+            
+            // Hide video initially
+            video.style.opacity = '0';
+            
+            // Click handler for poster
+            poster.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.playVideo(video, poster, index);
+            });
+            
+            // Video events
+            video.addEventListener('canplay', () => {
+                console.log(`✅ Video ${index} can play`);
+                this.videos[index].loaded = true;
+            });
+            
+            video.addEventListener('play', () => {
+                console.log(`▶️ Video ${index} started`);
+                this.videos[index].playing = true;
+                this.hidePlayButton(poster);
+                video.style.opacity = '1';
+            });
+            
+            video.addEventListener('pause', () => {
+                this.videos[index].playing = false;
+                this.showPlayButton(poster);
+            });
+            
+            video.addEventListener('error', (e) => {
+                console.error(`❌ Video ${index} error:`, e);
+                this.handleVideoError(video, poster, index);
+            });
+        }
+        
+        async playVideo(video, poster, index) {
+            try {
+                console.log(`🎬 Attempting to play video ${index}`);
+                
+                // Show loading state
+                poster.style.opacity = '0.5';
+                poster.querySelector('.ios-video-play').innerHTML = '⏳';
+                poster.querySelector('div:last-child').textContent = 'Loading...';
+                
+                // Load video if not loaded
+                if (video.readyState < 3) {
+                    video.load();
+                    await this.waitForVideoLoad(video);
+                }
+                
+                // Ensure video is ready
+                video.muted = true;
+                video.currentTime = 0;
+                
+                // Try to play
+                const playPromise = video.play();
+                
+                if (playPromise !== undefined) {
+                    await playPromise;
+                    console.log(`✅ Video ${index} playing successfully`);
+                    this.hidePlayButton(poster);
+                } else {
+                    throw new Error('Play promise undefined');
+                }
+                
+            } catch (error) {
+                console.error(`❌ Failed to play video ${index}:`, error);
+                this.showError(poster, error.message);
+            }
+        }
+        
+        waitForVideoLoad(video) {
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('Video load timeout'));
+                }, 10000);
+                
+                const onLoad = () => {
+                    clearTimeout(timeout);
+                    video.removeEventListener('canplay', onLoad);
+                    video.removeEventListener('error', onError);
+                    resolve();
+                };
+                
+                const onError = (e) => {
+                    clearTimeout(timeout);
+                    video.removeEventListener('canplay', onLoad);
+                    video.removeEventListener('error', onError);
+                    reject(e);
+                };
+                
+                if (video.readyState >= 3) {
+                    resolve();
+                } else {
+                    video.addEventListener('canplay', onLoad);
+                    video.addEventListener('error', onError);
+                }
+            });
+        }
+        
+        handleVideoError(video, poster, index) {
+            console.log(`🔄 Handling error for video ${index}`);
+            this.showError(poster, 'Video could not be loaded');
+        }
+        
+        showError(poster, message) {
+            poster.style.opacity = '1';
+            poster.querySelector('.ios-video-play').innerHTML = '⚠️';
+            poster.querySelector('div:last-child').textContent = message;
+            poster.style.background = 'linear-gradient(45deg, #8B0000 0%, #DC143C 50%, #8B0000 100%)';
+        }
+        
+        hidePlayButton(poster) {
+            poster.style.opacity = '0';
+            poster.style.pointerEvents = 'none';
+        }
+        
+        showPlayButton(poster) {
+            poster.style.opacity = '1';
+            poster.style.pointerEvents = 'auto';
+            poster.querySelector('.ios-video-play').innerHTML = '▶️';
+            poster.querySelector('div:last-child').textContent = 'Tap to play video';
+        }
+        
+        setupTouchActivation() {
+            document.addEventListener('touchstart', () => {
+                if (!this.touchActivated) {
+                    this.touchActivated = true;
+                    console.log('👆 Touch activated for iOS');
+                }
+            }, { once: true });
+        }
+        
+        initNormalVideos() {
+            // For non-iOS devices, use normal intersection observer
+            const videos = document.querySelectorAll('video');
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.play().catch(e => {
+                            console.log('Autoplay prevented:', e);
+                        });
+                    } else {
+                        entry.target.pause();
+                    }
+                });
+            }, { threshold: 0.5 });
+            
+            videos.forEach(video => {
+                video.muted = true;
+                observer.observe(video);
+            });
+        }
+    }
+    
+    // Add pulse animation CSS
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .video-poster-fallback:hover {
+            background: linear-gradient(45deg, #2a2a2a 0%, #3d3d3d 50%, #2a2a2a 100%) !important;
+        }
+        
+        .video-poster-fallback:active {
+            transform: scale(0.98);
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Initialize when ready
+    function initializeFallbackSystem() {
+        console.log('🚀 Initializing iOS fallback system');
+        new iOSVideoFallback();
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeFallbackSystem);
+    } else {
+        initializeFallbackSystem();
+    }
+    
+    window.iOSVideoFallback = iOSVideoFallback;
+    
+})();
 }

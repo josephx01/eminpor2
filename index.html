@@ -4211,86 +4211,74 @@ window.addEventListener('load', () => {
 
     console.log('✅ Forced Reels section & filters to always be visible');
 });
-// iOS Video problemini həll edən təkmilləşdirilmiş kod
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // iOS və Safari aşkarlanması
+    console.log('📱 Universal Video System Initialized');
+
+    // Device detection
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    const isMobile = window.innerWidth <= 768;
+    const isAndroid = /Android/.test(navigator.userAgent);
+    const isMobile = window.innerWidth <= 768 || isIOS || isAndroid;
     
-    console.log(`📱 Device Detection: iOS=${isIOS}, Safari=${isSafari}, Mobile=${isMobile}`);
-    
+    console.log(`📱 Device: iOS=${isIOS}, Android=${isAndroid}, Mobile=${isMobile}`);
+
     // ===============================
-    // iOS VIDEO HƏLL SİSTEMİ
+    // VIDEO CARD MANAGER
     // ===============================
-    
-    class iOSVideoManager {
-        constructor() {
-            this.videoCards = [];
-            this.userInteracted = false;
-            this.init();
-        }
+    const videoManager = {
+        videos: [],
+        userInteracted: false,
         
         init() {
             this.setupUserInteraction();
-            this.processAllVideos();
-            this.setupIntersectionObserver();
-        }
+            this.setupVideoCards();
+            this.setupModal();
+            console.log('✅ Video system ready');
+        },
         
         setupUserInteraction() {
-            // İstifadəçi ilk toxunuşu - vacib iOS üçün
-            const enableInteraction = () => {
-                this.userInteracted = true;
-                console.log('✅ User interaction registered');
-                
-                // Bütün videoları hazırla
-                this.videoCards.forEach(card => {
-                    if (card.video && !card.activated) {
-                        this.prepareVideo(card);
-                    }
-                });
-            };
-            
-            document.addEventListener('touchstart', enableInteraction, { once: true, passive: true });
-            document.addEventListener('click', enableInteraction, { once: true, passive: true });
-        }
-        
-        processAllVideos() {
-            const workCards = document.querySelectorAll('.work-card');
-            
-            workCards.forEach((card, index) => {
-                const video = card.querySelector('.work-video, video');
-                if (video) {
-                    this.createVideoCard(card, video, index);
+            const handleInteraction = () => {
+                if (!this.userInteracted) {
+                    this.userInteracted = true;
+                    console.log('👆 User interaction detected');
+                    
+                    // Prepare all videos after first interaction
+                    this.videos.forEach(video => {
+                        if (!video.activated) this.prepareVideo(video);
+                    });
                 }
-            });
-        }
-        
-        createVideoCard(card, video, index) {
-            const cardData = {
-                card: card,
-                video: video,
-                overlay: card.querySelector('.work-overlay'),
-                index: index,
-                activated: false,
-                playing: false
             };
             
-            // iOS üçün xüsusi ayarlar
-            if (isIOS) {
-                this.setupiOSVideo(cardData);
-            } else {
-                this.setupNormalVideo(cardData);
-            }
-            
-            this.videoCards.push(cardData);
-        }
+            document.addEventListener('touchstart', handleInteraction, { once: true, passive: true });
+            document.addEventListener('click', handleInteraction, { once: true, passive: true });
+        },
         
-        setupiOSVideo(cardData) {
-            const { video, card } = cardData;
+        setupVideoCards() {
+            document.querySelectorAll('.work-card, .reel-card').forEach((card, index) => {
+                const video = card.querySelector('video');
+                if (!video) return;
+                
+                const videoData = {
+                    card,
+                    video,
+                    overlay: card.querySelector('.work-overlay'),
+                    index,
+                    activated: false,
+                    playing: false,
+                    playBtn: null
+                };
+                
+                this.setupVideoAttributes(videoData);
+                this.setupVideoEvents(videoData);
+                this.videos.push(videoData);
+            });
             
-            // iOS üçün məcburi atributlar
+            console.log(`📊 Found ${this.videos.length} video cards`);
+        },
+        
+        setupVideoAttributes(videoData) {
+            const { video } = videoData;
+            
+            // Universal video attributes
             video.muted = true;
             video.playsInline = true;
             video.setAttribute('playsinline', '');
@@ -4298,259 +4286,172 @@ document.addEventListener('DOMContentLoaded', function() {
             video.preload = 'metadata';
             video.controls = false;
             
-            // Video source-ları təmizlə və təkrar əlavə et
-            this.fixVideoSources(video);
-            
-            // Play button əlavə et
-            this.addPlayButton(cardData);
-            
-            // Event handler-lər
-            this.setupVideoEvents(cardData);
-        }
-        
-        setupNormalVideo(cardData) {
-            const { video } = cardData;
-            
-            video.muted = true;
-            video.playsInline = true;
-            video.preload = 'metadata';
-            
-            this.setupVideoEvents(cardData);
-        }
-        
-        fixVideoSources(video) {
-            // Mövcud source-ları götür
-            const sources = Array.from(video.querySelectorAll('source'));
-            const videoSrc = video.src;
-            
-            // Video-nu təmizlə
-            video.innerHTML = '';
-            video.removeAttribute('src');
-            
-            // MP4 source əlavə et (iOS üçün ən yaxşı)
-            if (videoSrc) {
-                const source = document.createElement('source');
-                source.src = videoSrc;
-                source.type = 'video/mp4';
-                video.appendChild(source);
+            // iOS specific fixes
+            if (isIOS) {
+                this.setupIOSVideo(videoData);
             }
             
-            // Digər source-ları əlavə et
-            sources.forEach(source => {
-                if (source.src && source.src.includes('.mp4')) {
-                    const newSource = document.createElement('source');
-                    newSource.src = source.src;
-                    newSource.type = 'video/mp4';
-                    video.appendChild(newSource);
-                }
-            });
-            
-            // Video-nu yenidən yüklə
-            video.load();
-        }
+            // Android specific fixes
+            if (isAndroid) {
+                this.setupAndroidVideo(videoData);
+            }
+        },
         
-        addPlayButton(cardData) {
-            const { card, video } = cardData;
+        setupIOSVideo(videoData) {
+            const { video, card } = videoData;
             
-            // Play button container
-            const playContainer = document.createElement('div');
-            playContainer.className = 'ios-play-container';
-            playContainer.style.cssText = `
+            // Ensure poster exists for iOS
+            if (!video.poster) {
+                video.poster = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIHZpZXdCb3g9IjAgMCAxMCAxMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAiIGhlaWdodD0iMTAiIGZpbGw9IiMxYTFhMWEiLz48L3N2Zz4=';
+            }
+            
+            // Add play button for iOS
+            this.addPlayButton(videoData);
+        },
+        
+        setupAndroidVideo(videoData) {
+            const { video } = videoData;
+            
+            // Android-specific optimizations
+            video.preload = 'auto';
+        },
+        
+        addPlayButton(videoData) {
+            const { card, video } = videoData;
+            
+            const playBtn = document.createElement('button');
+            playBtn.className = 'video-play-btn';
+            playBtn.innerHTML = '▶';
+            playBtn.style.cssText = `
                 position: absolute;
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                z-index: 10;
-                pointer-events: none;
-                opacity: 0;
-                transition: opacity 0.3s ease;
-            `;
-            
-            // Play button
-            const playBtn = document.createElement('button');
-            playBtn.className = 'ios-play-btn';
-            playBtn.innerHTML = '▶';
-            playBtn.style.cssText = `
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
                 background: rgba(255, 165, 0, 0.9);
                 border: none;
-                border-radius: 50%;
-                width: 60px;
-                height: 60px;
-                font-size: 20px;
                 color: white;
+                font-size: 18px;
                 cursor: pointer;
-                pointer-events: auto;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-                transition: all 0.3s ease;
+                z-index: 10;
+                opacity: ${isMobile ? 1 : 0};
+                transition: opacity 0.3s ease;
                 display: flex;
                 align-items: center;
                 justify-content: center;
             `;
             
             playBtn.addEventListener('click', (e) => {
-                e.preventDefault();
                 e.stopPropagation();
-                this.playVideo(cardData);
+                this.playVideo(videoData);
             });
             
-            playContainer.appendChild(playBtn);
             card.style.position = 'relative';
-            card.appendChild(playContainer);
-            
-            cardData.playContainer = playContainer;
-            cardData.playBtn = playBtn;
-        }
+            card.appendChild(playBtn);
+            videoData.playBtn = playBtn;
+        },
         
-        setupVideoEvents(cardData) {
-            const { video, card, playContainer } = cardData;
+        setupVideoEvents(videoData) {
+            const { card, video, playBtn } = videoData;
             
-            // Mouse events (desktop)
+            // Desktop hover events
             if (!isMobile) {
                 card.addEventListener('mouseenter', () => {
-                    if (isIOS && !cardData.activated) {
-                        if (playContainer) playContainer.style.opacity = '1';
-                    } else {
-                        this.playVideo(cardData);
-                    }
+                    if (playBtn) playBtn.style.opacity = '1';
+                    this.playVideo(videoData);
                 });
                 
                 card.addEventListener('mouseleave', () => {
-                    if (playContainer) playContainer.style.opacity = '0';
-                    this.pauseVideo(cardData);
+                    if (playBtn) playBtn.style.opacity = '0';
+                    this.pauseVideo(videoData);
                 });
             }
             
-            // Touch events (mobile)
+            // Mobile touch events
             if (isMobile) {
-                card.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    if (isIOS && !cardData.activated) {
-                        if (playContainer) playContainer.style.opacity = '1';
-                    }
-                });
-                
                 card.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    if (cardData.playing) {
-                        this.openVideoModal(cardData);
+                    if (videoData.playing) {
+                        this.openModal(videoData);
                     } else {
-                        this.playVideo(cardData);
+                        this.playVideo(videoData);
                     }
                 });
             }
             
-            // Video events
-            video.addEventListener('canplay', () => {
-                console.log(`✅ Video ${cardData.index} can play`);
-                cardData.activated = true;
-            });
-            
+            // Video state events
             video.addEventListener('play', () => {
-                cardData.playing = true;
-                if (playContainer) playContainer.style.opacity = '0';
+                videoData.playing = true;
+                if (playBtn) playBtn.style.opacity = '0';
             });
             
             video.addEventListener('pause', () => {
-                cardData.playing = false;
+                videoData.playing = false;
+                if (playBtn && isMobile) playBtn.style.opacity = '1';
+            });
+            
+            video.addEventListener('canplay', () => {
+                videoData.activated = true;
             });
             
             video.addEventListener('error', (e) => {
-                console.error(`❌ Video ${cardData.index} error:`, e);
-                this.handleVideoError(cardData);
+                console.error('Video error:', e);
+                this.handleVideoError(videoData);
             });
-        }
+        },
         
-        async playVideo(cardData) {
-            const { video, playBtn } = cardData;
+        async playVideo(videoData) {
+            const { video } = videoData;
             
             try {
-                // Loading state
-                if (playBtn) playBtn.innerHTML = '⏳';
-                
-                // iOS üçün xüsusi hazırlıq
+                // On iOS, wait for user interaction
                 if (isIOS && !this.userInteracted) {
-                    console.log('⚠️ Waiting for user interaction...');
+                    console.log('Waiting for user interaction...');
                     return;
                 }
                 
-                // Video hazırlığını yoxla
+                // Ensure video is ready
                 if (video.readyState < 3) {
                     video.load();
-                    await this.waitForVideo(video);
+                    await new Promise((resolve) => {
+                        if (video.readyState >= 3) return resolve();
+                        video.addEventListener('canplay', resolve, { once: true });
+                        video.addEventListener('error', resolve, { once: true });
+                    });
                 }
                 
-                // Səssiz rejimi təmin et
-                video.muted = true;
                 video.currentTime = 0;
-                
-                // Oynatmağa çalış
-                const playPromise = video.play();
-                
-                if (playPromise !== undefined) {
-                    await playPromise;
-                    console.log(`▶️ Video ${cardData.index} playing`);
-                } else {
-                    throw new Error('Play promise undefined');
-                }
+                await video.play();
                 
             } catch (error) {
-                console.error(`❌ Play failed for video ${cardData.index}:`, error);
-                this.handleVideoError(cardData);
+                console.error('Play failed:', error);
+                this.handleVideoError(videoData);
             }
-        }
+        },
         
-        pauseVideo(cardData) {
-            const { video } = cardData;
-            
-            if (video && !video.paused) {
+        pauseVideo(videoData) {
+            const { video } = videoData;
+            if (!video.paused) {
                 video.pause();
                 video.currentTime = 0;
             }
-        }
+        },
         
-        waitForVideo(video) {
-            return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('Video load timeout'));
-                }, 5000);
-                
-                const onReady = () => {
-                    clearTimeout(timeout);
-                    video.removeEventListener('canplay', onReady);
-                    video.removeEventListener('error', onError);
-                    resolve();
-                };
-                
-                const onError = (e) => {
-                    clearTimeout(timeout);
-                    video.removeEventListener('canplay', onReady);
-                    video.removeEventListener('error', onError);
-                    reject(e);
-                };
-                
-                if (video.readyState >= 3) {
-                    resolve();
-                } else {
-                    video.addEventListener('canplay', onReady);
-                    video.addEventListener('error', onError);
-                }
-            });
-        }
-        
-        handleVideoError(cardData) {
-            const { playBtn, card } = cardData;
+        handleVideoError(videoData) {
+            const { video, playBtn } = videoData;
             
             if (playBtn) {
                 playBtn.innerHTML = '⚠️';
                 playBtn.style.background = '#ff4444';
             }
             
-            // Fallback şəkil
-            this.createFallbackImage(cardData);
-        }
+            // Show error fallback
+            this.showErrorFallback(videoData);
+        },
         
-        createFallbackImage(cardData) {
-            const { card, video } = cardData;
+        showErrorFallback(videoData) {
+            const { card, video } = videoData;
             
             const fallback = document.createElement('div');
             fallback.className = 'video-fallback';
@@ -4560,87 +4461,132 @@ document.addEventListener('DOMContentLoaded', function() {
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: linear-gradient(45deg, #333 0%, #555 50%, #333 100%);
+                background: #333;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 color: white;
-                font-family: 'Montserrat', sans-serif;
-                text-align: center;
                 z-index: 5;
             `;
+            fallback.innerHTML = '<div>Video playback failed</div>';
             
-            fallback.innerHTML = `
-                <div>
-                    <div style="font-size: 2rem; margin-bottom: 10px;">🎥</div>
-                    <div>Video yüklənə bilmir</div>
-                </div>
-            `;
-            
-            card.style.position = 'relative';
             card.appendChild(fallback);
-            
-            // Video-nu gizlət
             video.style.display = 'none';
-        }
+        },
         
-        openVideoModal(cardData) {
-            // Modal açmaq üçün mövcud kod
-            const videoIndex = this.videoCards.indexOf(cardData);
-            if (videoIndex !== -1 && window.openVideoModal) {
-                window.openVideoModal(videoIndex);
-            }
-        }
-        
-        setupIntersectionObserver() {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    const cardIndex = this.videoCards.findIndex(card => card.card === entry.target);
-                    
-                    if (cardIndex !== -1) {
-                        const cardData = this.videoCards[cardIndex];
-                        
-                        if (!entry.isIntersecting) {
-                            this.pauseVideo(cardData);
-                        }
+        setupModal() {
+            // Create modal if not exists
+            if (!document.getElementById('videoModal')) {
+                const modalHTML = `
+                    <div id="videoModal" class="video-modal">
+                        <div class="modal-overlay"></div>
+                        <div class="modal-container">
+                            <button class="modal-close">&times;</button>
+                            <video id="modalVideo" controls></video>
+                            <div class="modal-info">
+                                <h3 class="modal-title"></h3>
+                                <p class="modal-description"></p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+                
+                // Modal styles
+                const style = document.createElement('style');
+                style.textContent = `
+                    .video-modal {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.9);
+                        z-index: 1000;
+                        display: none;
+                        align-items: center;
+                        justify-content: center;
                     }
-                });
-            }, {
-                rootMargin: '50px',
-                threshold: 0.1
-            });
+                    .video-modal.active {
+                        display: flex;
+                    }
+                    .modal-container {
+                        position: relative;
+                        width: 90%;
+                        max-width: 800px;
+                    }
+                    #modalVideo {
+                        width: 100%;
+                        max-height: 80vh;
+                    }
+                    .modal-close {
+                        position: absolute;
+                        top: -40px;
+                        right: 0;
+                        background: #ff5555;
+                        border: none;
+                        color: white;
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 50%;
+                        font-size: 18px;
+                        cursor: pointer;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
             
-            this.videoCards.forEach(cardData => {
-                observer.observe(cardData.card);
+            // Event listeners
+            document.querySelector('.modal-close').addEventListener('click', this.closeModal);
+            document.querySelector('.modal-overlay').addEventListener('click', this.closeModal);
+            
+            // Keyboard controls
+            document.addEventListener('keydown', (e) => {
+                if (document.getElementById('videoModal').classList.contains('active')) {
+                    if (e.key === 'Escape') this.closeModal();
+                }
             });
+        },
+        
+        openModal(videoData) {
+            const modal = document.getElementById('videoModal');
+            const modalVideo = document.getElementById('modalVideo');
+            const modalTitle = document.querySelector('.modal-title');
+            const modalDesc = document.querySelector('.modal-description');
+            
+            // Set video source
+            modalVideo.src = videoData.video.src || videoData.video.dataset.src;
+            
+            // Set video info
+            if (videoData.overlay) {
+                modalTitle.textContent = videoData.overlay.querySelector('h3')?.textContent || 'Video';
+                modalDesc.textContent = videoData.overlay.querySelector('p')?.textContent || '';
+            }
+            
+            // Show modal
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            
+            // Play video in modal
+            modalVideo.play().catch(e => console.log('Modal play error:', e));
+        },
+        
+        closeModal() {
+            const modal = document.getElementById('videoModal');
+            const modalVideo = document.getElementById('modalVideo');
+            
+            modalVideo.pause();
+            modalVideo.src = '';
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
         }
-    }
-    
-    // ===============================
-    // SİSTEMİ İŞƏ SAL
-    // ===============================
-    
-    // Video manager-i başlat
-    const videoManager = new iOSVideoManager();
-    
-    // Global erişim üçün
-    window.iOSVideoManager = videoManager;
-    
-    console.log(`🚀 iOS Video Manager initialized with ${videoManager.videoCards.length} videos`);
-    
-    // Debug məlumatları
-    setTimeout(() => {
-        console.log('📊 Video Cards Status:');
-        videoManager.videoCards.forEach((card, index) => {
-            console.log(`Video ${index}:`, {
-                activated: card.activated,
-                playing: card.playing,
-                readyState: card.video.readyState,
-                src: card.video.src || 'No source'
-            });
-        });
-    }, 2000);
-    
+    };
+
+    // Initialize the system
+    videoManager.init();
+
+    // Make available globally
+    window.videoManager = videoManager;
 });
 }
     </script>
